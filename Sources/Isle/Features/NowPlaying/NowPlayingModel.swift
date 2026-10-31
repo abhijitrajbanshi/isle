@@ -27,7 +27,7 @@ final class NowPlayingModel {
     /// Vivid tint derived from the artwork, used by the waveform.
     private(set) var accent: Color = .white
     private(set) var lastPlayed: Date = .distantPast
-    /// Set a minute after playback pauses; ends the live activity.
+    /// Set shortly after playback pauses; ends the live activity.
     private(set) var pauseExpired = false
     /// Playback position anchor; `elapsed(at:)` extrapolates from here at `rate`.
     private(set) var anchor: (elapsed: Double, date: Date, rate: Double) = (0, .distantPast, 1)
@@ -46,10 +46,12 @@ final class NowPlayingModel {
     @ObservationIgnored private var artworkClearTask: Task<Void, Never>?
     /// How long the previous track's artwork stays while the next one's loads.
     @ObservationIgnored var artworkGrace: Duration = .seconds(1)
-    /// How long a paused track stays in the notch.
-    @ObservationIgnored var lingerDuration: Duration = .seconds(60)
+    /// How long a paused track stays in the notch: long enough to ride out
+    /// the brief pauses between tracks and videos without flickering.
+    @ObservationIgnored var lingerDuration: Duration = .seconds(2)
 
-    /// Stays in the notch while playing and for a minute after pausing.
+    /// Stays in the notch while playing; leaves shortly after pausing. The
+    /// paused track is still in the expanded island, to resume it.
     var isActive: Bool {
         isEnabled() && track != nil && (isPlaying || !pauseExpired)
     }
