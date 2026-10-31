@@ -4,6 +4,18 @@ The iPhone Dynamic Island, for the MacBook notch. Native Swift + SwiftUI,
 Apple Silicon, macOS 14 or later. See [FEATURES.md](FEATURES.md) for the full
 feature list.
 
+## Install
+
+1. Download **Isle-x.y.z.zip** from the
+   [latest release](https://github.com/abhijitrajbanshi/isle/releases/latest)
+   and unzip it.
+2. Drag **Isle.app** into **Applications** and open it.
+3. macOS will say it can't verify the developer (Isle isn't notarized yet).
+   Open **System Settings → Privacy & Security**, scroll down and click
+   **Open Anyway**. You only do this once.
+
+Requires an Apple silicon Mac with macOS 14 Sonoma or later.
+
 ## Build & run
 
 ```bash
