@@ -41,7 +41,10 @@ struct IslandView: View {
 
     private func body(for presentation: Presentation, shape: IslandShape) -> some View {
         let outline = NotchShape(shoulder: shape.shoulder, radius: shape.radius)
-        return IslandSurface(shape: outline, style: preferences.style)
+        // bare beside the notch, and while shrinking back into it (hovering
+        // the empty notch still shows the glass)
+        let bare = presentation.isCompact || (presentation.isIdle && !engine.isHovering)
+        return IslandSurface(shape: outline, style: preferences.style, bare: bare)
             .frame(width: shape.outerWidth, height: shape.height)
             .overlay(alignment: .top) {
                 ZStack(alignment: .top) {
@@ -79,7 +82,7 @@ struct IslandView: View {
             let d = engine.layout.bubbleDiameter
             BubbleContent(activity: secondary, diameter: d)
                 .frame(width: d, height: d)
-                .background(IslandSurface(shape: Circle(), style: preferences.style))
+                .background(IslandSurface(shape: Circle(), style: preferences.style, bare: true))
                 .contentShape(Circle())
                 .onTapGesture { engine.expand() }
                 .offset(x: d + IslandLayout.bubbleGap)
@@ -145,6 +148,12 @@ private struct SystemInteractions: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+private extension Presentation {
+    var isCompact: Bool {
+        if case .compact = self { true } else { false }
     }
 }
 

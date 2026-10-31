@@ -22,6 +22,9 @@ enum IslandStyle: String, CaseIterable, Identifiable {
 struct IslandSurface<S: Shape>: View {
     let shape: S
     let style: IslandStyle
+    /// Glass only: drop the material so just the content shows (compact
+    /// activities beside the notch); it fades back in when the island grows.
+    var bare = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -29,7 +32,7 @@ struct IslandSurface<S: Shape>: View {
         if style == .black || reduceTransparency {
             shape.fill(.black)
         } else {
-            glass
+            glass.opacity(bare ? 0 : 1)
         }
     }
 
