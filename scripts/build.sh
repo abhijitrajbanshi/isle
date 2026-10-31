@@ -3,15 +3,21 @@
 #
 #   scripts/build.sh              build (ad-hoc signed)
 #   scripts/build.sh --install    build, copy to /Applications, relaunch
-#   scripts/build.sh --release    test, build, sign, zip (and notarize if configured)
+#   scripts/build.sh --release    test, build, sign, zip (and notarize if configured),
+#                                 then write build/appcast.xml for auto-updates
 #
 # Release signing / notarization (optional):
 #   SIGN_IDENTITY="Developer ID Application: Name (TEAMID)"
 #   NOTARY_PROFILE=<profile saved with `xcrun notarytool store-credentials`>
+#
+# Auto-update signing uses the Sparkle EdDSA key in the login keychain
+# (account "isle", created once with Sparkle's generate_keys).
 set -euo pipefail
 
 ROOT=${0:A:h:h}
 APP="$ROOT/build/Isle.app"
+REPO=abhijitrajbanshi/isle
+SPARKLE_BIN="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
 MODE=${1:-}
 cd "$ROOT"
 
@@ -39,6 +45,9 @@ echo "› Assembling bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Isle" "$APP/Contents/MacOS/Isle"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Isle"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
@@ -54,16 +63,20 @@ cp .build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 if [[ -n "${SIGN_IDENTITY:-}" ]]; then
     echo "› Signing with $SIGN_IDENTITY (hardened runtime)"
-    codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" \
-        "$APP/Contents/Resources/libIsleMediaRemote.dylib"
-    codesign --force --timestamp --options runtime --entitlements Resources/Isle.entitlements \
-        --sign "$SIGN_IDENTITY" "$APP"
+    SIGN=(codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY")
 else
     echo "› Signing (ad-hoc)"
-    codesign --force --sign - "$APP/Contents/Resources/libIsleMediaRemote.dylib"
-    codesign --force --sign - "$APP"
+    SIGN=(codesign --force --sign -)
 fi
-codesign --verify --strict "$APP"
+# inside out: Sparkle's helpers, then the framework, then the app
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+"${SIGN[@]}" "$SPARKLE/XPCServices/Installer.xpc"
+"${SIGN[@]}" --preserve-metadata=entitlements "$SPARKLE/XPCServices/Downloader.xpc"
+"${SIGN[@]}" "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app"
+"${SIGN[@]}" "$APP/Contents/Frameworks/Sparkle.framework"
+"${SIGN[@]}" "$APP/Contents/Resources/libIsleMediaRemote.dylib"
+"${SIGN[@]}" --entitlements Resources/Isle.entitlements "$APP"
+codesign --verify --strict --deep "$APP"
 echo "✓ $APP"
 
 case "$MODE" in
@@ -88,5 +101,28 @@ case "$MODE" in
         echo "  (not notarized: set SIGN_IDENTITY and NOTARY_PROFILE to notarize)"
     fi
     echo "✓ $ZIP"
+
+    echo "› Writing appcast"
+    # sign_update prints: sparkle:edSignature="…" length="…"
+    SIGNATURE=$("$SPARKLE_BIN/sign_update" --account isle "$ZIP")
+    cat > build/appcast.xml <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Isle</title>
+    <item>
+      <title>Isle $VERSION</title>
+      <pubDate>$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+      <sparkle:version>$BUILD</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/$REPO/releases/tag/v$VERSION</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/$REPO/releases/download/v$VERSION/Isle-$VERSION.zip"
+                 type="application/octet-stream" $SIGNATURE/>
+    </item>
+  </channel>
+</rss>
+XML
+    echo "✓ build/appcast.xml (attach it to the release next to the zip)"
     ;;
 esac

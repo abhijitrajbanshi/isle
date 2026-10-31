@@ -7,6 +7,10 @@ let package = Package(
     products: [
         .executable(name: "Isle", targets: ["Isle"]),
     ],
+    dependencies: [
+        // Auto-updates: EdDSA-signed appcast, the standard macOS updater.
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
+    ],
     targets: [
         // Platform-independent island logic: presentation state machine,
         // layout and gesture interpretation. Fully unit tested.
@@ -15,7 +19,7 @@ let package = Package(
         // The app: AppKit shell, system integrations and SwiftUI views.
         .executableTarget(
             name: "Isle",
-            dependencies: ["IsleKit"],
+            dependencies: ["IsleKit", .product(name: "Sparkle", package: "Sparkle")],
             linkerSettings: [
                 .linkedFramework("IOKit"),
                 .linkedFramework("IOBluetooth"),

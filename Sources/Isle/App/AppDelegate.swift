@@ -6,6 +6,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var container: IsleContainer!
     private var islandWindow: IslandWindowController!
+    private var updater: Updater!
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
 
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        updater = Updater()
         container = IsleContainer()
         container.openSettings = { [weak self] in self?.showSettings() }
         islandWindow = IslandWindowController(container: container)
@@ -44,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.button?.image?.isTemplate = true
             let menu = NSMenu()
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
+            menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit Isle", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             item.menu = menu
@@ -54,11 +57,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
+
     // MARK: Settings
 
     @objc func showSettings() {
         if settingsWindow == nil {
-            let controller = NSHostingController(rootView: SettingsView().isleEnvironment(container))
+            let controller = NSHostingController(rootView: SettingsView().isleEnvironment(container).environment(updater))
             controller.sizingOptions = .preferredContentSize
             let window = NSWindow(contentViewController: controller)
             window.title = "Isle"

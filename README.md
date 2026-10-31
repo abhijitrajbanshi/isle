@@ -68,14 +68,26 @@ swift test                                   # IsleKit engine tests + app featur
 ## Release
 
 ```bash
-./scripts/build.sh --release                 # tests → build → sign → build/Isle-<version>.zip
+git tag -a v1.2.0 -m "Isle 1.2.0" && git push origin main v1.2.0
+./scripts/build.sh --release   # tests → build → sign → build/Isle-1.2.0.zip + build/appcast.xml
+gh release create v1.2.0 build/Isle-1.2.0.zip build/appcast.xml --title "Isle 1.2.0" --notes-file … --latest
 ```
+
+**Always attach `appcast.xml` next to the zip.** Installed copies check
+`releases/latest/download/appcast.xml` once a day (Sparkle); a release without
+it is invisible to them.
 
 * **Version** comes from the latest git tag (`v1.2.0` → 1.2.0); the build number is the commit count.
 * **Signing:** set `SIGN_IDENTITY="Developer ID Application: …"` for a hardened-runtime
   signature with `Resources/Isle.entitlements`. Without it, builds are ad-hoc signed.
 * **Notarization:** also set `NOTARY_PROFILE` (saved with `xcrun notarytool store-credentials`)
   and the zip is notarized and stapled.
+* **Auto-updates** are signed with a Sparkle EdDSA key in the login keychain
+  (account `isle`); `Info.plist` carries its public half (`SUPublicEDKey`), and
+  installed copies reject any update not signed with it. **Back the key up**:
+  `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account isle -x isle-sparkle.key`,
+  store the file somewhere safe (a password manager), and delete it locally. Losing
+  it means existing installs can never be updated again.
 * **CI** (`.github/workflows/ci.yml`) runs tests, builds the app, and uploads the
   app and the rendered island states on every push and pull request.
 

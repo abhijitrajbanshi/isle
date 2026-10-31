@@ -36,6 +36,12 @@
 	<string>Isle shows your next event and reminds you before it starts.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Isle shows your next event and reminds you before it starts.</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/abhijitrajbanshi/isle/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>fm/2m3gmjxWgXa9bLvpbDVYCRQ9YX5SHanspe58i/bY=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Isle reads and controls what's playing in Music and Spotify.</string>
 </dict>

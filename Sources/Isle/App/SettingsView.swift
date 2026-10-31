@@ -7,10 +7,12 @@ struct SettingsView: View {
     @Environment(IslandEngine.self) private var engine
     @Environment(CalendarModel.self) private var calendar
     @Environment(PowerMonitor.self) private var power
+    @Environment(Updater.self) private var updater
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         @Bindable var p = preferences
+        @Bindable var u = updater
         Form {
             Section {
                 Header()
@@ -84,6 +86,16 @@ struct SettingsView: View {
                 LabeledContent("Preview") {
                     Button("Play a Tour", action: tour)
                 }
+            }
+
+            Section("Updates") {
+                LabeledContent("Isle \(Updater.currentVersion)") {
+                    Button("Check Now", action: updater.checkForUpdates)
+                        .disabled(!updater.canCheck)
+                }
+                Toggle("Check for updates automatically", isOn: $u.automaticallyChecks)
+                Toggle("Download and install automatically", isOn: $u.automaticallyDownloads)
+                    .disabled(!u.automaticallyChecks)
             }
         }
         .formStyle(.grouped)

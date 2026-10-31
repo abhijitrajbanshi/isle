@@ -47,6 +47,8 @@ nothing shows twice.
 
 ## 4. Mac-only additions
 
+* **Auto-updates** — checks GitHub once a day and installs signed updates (Sparkle); “Check for Updates…” in the menu bar and Settings.
+
 * **File Shelf** — drag a file onto the notch and the island opens a shelf.
   Files stay there; drag them out, open them, show them in Finder or send them
   over **AirDrop**.
