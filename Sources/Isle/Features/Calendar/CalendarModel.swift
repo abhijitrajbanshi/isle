@@ -74,8 +74,11 @@ final class CalendarModel {
     /// 5-minute alert, or leaves the notch; at most 30 minutes away.
     private func nextTransition() -> Date {
         let now = Date.now
-        let candidates = upcoming.flatMap { [$0.start - 15 * 60, $0.start - 5 * 60 - 30, $0.start + 5 * 60] }
-        return candidates.filter { $0 > now }.min().map { min($0, now + 30 * 60) } ?? now + 30 * 60
+        let ceiling = now.addingTimeInterval(30 * 60)
+        let offsets: [TimeInterval] = [-15 * 60, -5 * 60 - 30, 5 * 60]
+        let candidates: [Date] = upcoming.flatMap { event in offsets.map { event.start.addingTimeInterval($0) } }
+        guard let next = candidates.filter({ $0 > now }).min() else { return ceiling }
+        return min(next, ceiling)
     }
 
     func requestAccess() {
