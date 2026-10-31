@@ -104,6 +104,30 @@ struct NowPlayingModelTests {
         #expect(!model.isActive)
     }
 
+    /// Regression: the player's stale "still playing" report right after a
+    /// click flipped the button back, so it flickered pause → play → pause.
+    @Test func staleReportAfterToggleIsIgnored() {
+        let model = NowPlayingModel()
+        model.update(track: track, isPlaying: true, elapsed: 10, timestamp: .now)
+        model.togglePlayPause()
+        #expect(!model.isPlaying)
+        model.update(track: track, isPlaying: true, elapsed: 10, timestamp: .now)
+        #expect(!model.isPlaying)
+        model.update(track: track, isPlaying: false, elapsed: 10, timestamp: .now)
+        // confirmed: later reports are trusted again
+        model.update(track: track, isPlaying: true, elapsed: 10, timestamp: .now)
+        #expect(model.isPlaying)
+    }
+
+    @Test func toggleThatNeverLandsGivesWay() {
+        let model = NowPlayingModel()
+        model.toggleSettleTime = 0
+        model.update(track: track, isPlaying: true, elapsed: 10, timestamp: .now)
+        model.togglePlayPause()
+        model.update(track: track, isPlaying: true, elapsed: 10, timestamp: .now)
+        #expect(model.isPlaying)
+    }
+
     @Test func clearRemovesTrack() {
         let model = NowPlayingModel()
         model.update(track: track, isPlaying: true, elapsed: 0, timestamp: .now)

@@ -71,6 +71,8 @@ static void refreshNow(void) {
                         out[@"artwork"] = [artwork base64EncodedStringWithOptions:0];
                         lastArtworkKey = key;
                     }
+                } else {
+                    lastArtworkKey = nil; // resend in full when it comes back
                 }
                 emit(out);
             });

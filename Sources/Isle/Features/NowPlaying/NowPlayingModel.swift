@@ -36,6 +36,11 @@ final class NowPlayingModel {
     @ObservationIgnored var isEnabled: () -> Bool = { true }
     @ObservationIgnored private var artworkKey: String?
     @ObservationIgnored private var lingerTask: Task<Void, Never>?
+    /// After a click, players report their old state for a moment; until
+    /// they confirm the change (or this deadline passes) those reports are
+    /// stale and would flip the button back and forth.
+    @ObservationIgnored private var expectedPlaying: (value: Bool, until: Date)?
+    @ObservationIgnored var toggleSettleTime: TimeInterval = 1.5
     /// How long a paused track stays in the notch.
     @ObservationIgnored var lingerDuration: Duration = .seconds(60)
 
@@ -71,6 +76,7 @@ final class NowPlayingModel {
         // optimistic; the source confirms within a few hundred ms
         anchor = (elapsed(), .now, anchor.rate)
         isPlaying.toggle()
+        expectedPlaying = (isPlaying, .now + toggleSettleTime)
         playbackChanged()
         perform(.togglePlayPause)
     }
@@ -92,8 +98,16 @@ final class NowPlayingModel {
     // MARK: Source updates
 
     /// - Parameter rate: playback speed (1 = normal); players report 0 while paused.
-    func update(track next: Track, isPlaying playing: Bool, elapsed: Double, timestamp: Date, rate: Double = 1) {
+    func update(track next: Track, isPlaying reported: Bool, elapsed: Double, timestamp: Date, rate: Double = 1) {
         let isNewTrack = track != next
+        var playing = reported
+        if let expected = expectedPlaying {
+            if reported == expected.value || isNewTrack || Date.now > expected.until {
+                expectedPlaying = nil
+            } else {
+                playing = expected.value // stale report from before the click
+            }
+        }
         if isNewTrack { track = next; pauseExpired = false }
         let playingChanged = isPlaying != playing
         if playingChanged { isPlaying = playing }
@@ -130,6 +144,7 @@ final class NowPlayingModel {
     func clear() {
         lingerTask?.cancel()
         pauseExpired = false
+        expectedPlaying = nil
         guard track != nil else { return }
         track = nil
         isPlaying = false

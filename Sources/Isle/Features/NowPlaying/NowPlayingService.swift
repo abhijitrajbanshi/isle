@@ -113,6 +113,7 @@ final class NowPlayingService {
         case "info":
             bridgeHasTrack = true
             source = .bridge
+            let previous = model.track
             let track = NowPlayingModel.Track(
                 title: message.title ?? "", artist: message.artist ?? "", album: message.album ?? "",
                 duration: message.duration ?? 0, bundleID: Self.appBundleID(for: message.bundleID))
@@ -122,7 +123,9 @@ final class NowPlayingService {
                          rate: message.rate ?? 1)
             if let base64 = message.artwork {
                 model.setArtwork(Data(base64Encoded: base64), key: message.artworkKey)
-            } else if message.artworkKey == nil {
+            } else if message.artworkKey == nil, model.track != previous {
+                // players drop artwork for a moment around play/pause;
+                // only a new track without artwork clears it
                 model.setArtwork(nil, key: nil)
             }
         default:
