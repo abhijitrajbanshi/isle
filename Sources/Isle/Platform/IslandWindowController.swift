@@ -14,6 +14,8 @@ final class IslandWindowController {
     private let panel = NotchPanel()
     private let sensor: HoverSensorPanel
     private let root = IslandRootContainer()
+    /// Keeps the island out of Space-switch animations (nil if unavailable).
+    private let overlaySpace = OverlaySpace()
     private let container: IsleContainer
     private var engine: IslandEngine { container.engine }
     private var monitors: [Any] = []
@@ -59,9 +61,15 @@ final class IslandWindowController {
                            y: screen.frame.maxY - Self.canvas.height,
                            width: Self.canvas.width, height: Self.canvas.height)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
+        orderFront()
+        syncHitArea()
+    }
+
+    private func orderFront() {
         panel.orderFrontRegardless()
         sensor.orderFrontRegardless()
-        syncHitArea()
+        overlaySpace?.add(panel)
+        overlaySpace?.add(sensor)
     }
 
     private func observeSystem() {
@@ -75,10 +83,7 @@ final class IslandWindowController {
                 MainActor.assumeIsolated { self?.place() }
             },
             workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.panel.orderFrontRegardless()
-                    self?.sensor.orderFrontRegardless()
-                }
+                MainActor.assumeIsolated { self?.orderFront() }
             },
         ]
         observeDisplayPreference()
