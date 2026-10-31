@@ -37,13 +37,13 @@ Priority when several are live: Timer › Now Playing › Event › Privacy.
 | Charging connected / disconnected | ⚡ Charging · 82 % with a battery glyph (wide) |
 | Low battery | Banner at 20 % and 10 % |
 | Low Power Mode | Wide alert when toggled |
-| Silent-mode switch | Volume HUD; mute shows a red "Silent" state |
-| Volume HUD | Volume HUD — drag on it to change volume |
-| — | Brightness HUD (built-in display), draggable |
 | AirPods connected (with battery) | Any Bluetooth device: AirPods / Beats / keyboard / mouse icon, name, battery ring when the device reports it |
 | Timer finished | Banner with Repeat / Stop, plays a sound |
 | — | Caps Lock on / off |
 | — | Event starting in 5 minutes |
+
+Volume and brightness are left to macOS's own on-screen indicators, so
+nothing shows twice.
 
 ## 4. Mac-only additions
 
@@ -70,7 +70,5 @@ Priority when several are live: Timer › Now Playing › Event › Privacy.
 
 * **Focus mode changes** — no public API without Full Disk Access.
 * **Other apps' notifications** — macOS doesn't expose them.
-* **Hiding Apple's own volume / brightness pop-up** — needs private APIs that
-  break with each macOS release, so Isle shows its HUD alongside it.
 * **AirPods battery** is read from a private property. It is shown when
   macOS provides it and left out otherwise.

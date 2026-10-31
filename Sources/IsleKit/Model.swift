@@ -65,8 +65,6 @@ public struct EventInfo: Equatable, Sendable {
 
 /// Short-lived system alerts.
 public enum IslandAlert: Equatable, Sendable {
-    case volume(level: Double, muted: Bool)
-    case brightness(level: Double)
     case capsLock(isOn: Bool)
     case power(level: Int, isCharging: Bool)
     case lowPowerMode(isOn: Bool, level: Int)
@@ -76,7 +74,7 @@ public enum IslandAlert: Equatable, Sendable {
     case eventSoon(EventInfo)
 
     public enum Kind: Hashable, Sendable {
-        case volume, brightness, capsLock, power, lowBattery, device, timer, event
+        case capsLock, power, lowBattery, device, timer, event
     }
 
     public enum Style: Sendable {
@@ -90,8 +88,6 @@ public enum IslandAlert: Equatable, Sendable {
 
     public var kind: Kind {
         switch self {
-        case .volume: .volume
-        case .brightness: .brightness
         case .capsLock: .capsLock
         case .power, .lowPowerMode: .power
         case .lowBattery: .lowBattery
@@ -103,7 +99,7 @@ public enum IslandAlert: Equatable, Sendable {
 
     public var style: Style {
         switch self {
-        case .volume, .brightness, .capsLock: .hud
+        case .capsLock: .hud
         case .power, .lowPowerMode: .wide
         case .lowBattery, .device, .timerDone, .eventSoon: .banner
         }
@@ -112,7 +108,7 @@ public enum IslandAlert: Equatable, Sendable {
     /// How long the alert stays up when the pointer isn't on it.
     public var duration: Duration {
         switch self {
-        case .volume, .brightness, .capsLock: .milliseconds(1500)
+        case .capsLock: .milliseconds(1500)
         case .power, .lowPowerMode: .milliseconds(2600)
         case .timerDone: .seconds(12)
         case .lowBattery, .device, .eventSoon: .seconds(4)
@@ -128,7 +124,7 @@ public enum Presentation: Equatable, Sendable {
     case expanded
 
     /// Stable while the *kind* of content is unchanged, so views can key
-    /// transitions on it without replaying them on every volume tick.
+    /// transitions on it without replaying them on every update.
     public var contentKey: String {
         switch self {
         case .idle: "idle"

@@ -58,37 +58,34 @@ enum SnapshotRenderer {
             c.engine.activities = { [.calendar] }
         },
         Scene(name: "07-compact-privacy") { $0.engine.activities = { [.privacy] } },
-        Scene(name: "08-hud-volume") { $0.engine.present(.volume(level: 0.62, muted: false)) },
-        Scene(name: "09-hud-silent") { $0.engine.present(.volume(level: 0.62, muted: true)) },
-        Scene(name: "10-hud-brightness") { $0.engine.present(.brightness(level: 0.4)) },
-        Scene(name: "11-hud-capslock") { $0.engine.present(.capsLock(isOn: true)) },
-        Scene(name: "12-wide-charging") { $0.engine.present(.power(level: 82, isCharging: true)) },
-        Scene(name: "13-wide-lowpower") { $0.engine.present(.lowPowerMode(isOn: true, level: 34)) },
-        Scene(name: "14-banner-airpods") {
+        Scene(name: "08-hud-capslock") { $0.engine.present(.capsLock(isOn: true)) },
+        Scene(name: "09-wide-charging") { $0.engine.present(.power(level: 82, isCharging: true)) },
+        Scene(name: "10-wide-lowpower") { $0.engine.present(.lowPowerMode(isOn: true, level: 34)) },
+        Scene(name: "11-banner-airpods") {
             $0.engine.present(.device(DeviceInfo(name: "AirPods Pro", symbol: "airpodspro", battery: 86, isConnected: true)))
         },
-        Scene(name: "15-banner-lowbattery") { $0.engine.present(.lowBattery(level: 10)) },
-        Scene(name: "16-banner-timer") { $0.engine.present(.timerDone) },
-        Scene(name: "17-banner-event") {
+        Scene(name: "12-banner-lowbattery") { $0.engine.present(.lowBattery(level: 10)) },
+        Scene(name: "13-banner-timer") { $0.engine.present(.timerDone) },
+        Scene(name: "14-banner-event") {
             $0.engine.present(.eventSoon(EventInfo(title: "Design review", start: .now.addingTimeInterval(300),
                                                    color: IslandColor(red: 0.35, green: 0.5, blue: 1))))
         },
-        Scene(name: "18-expanded-home") { c in
+        Scene(name: "15-expanded-home") { c in
             playing(c)
             c.engine.expand(tab: .home)
         },
-        Scene(name: "19-expanded-home-empty") { $0.engine.expand(tab: .home) },
-        Scene(name: "20-expanded-home-timer") { c in
+        Scene(name: "16-expanded-home-empty") { $0.engine.expand(tab: .home) },
+        Scene(name: "17-expanded-home-timer") { c in
             playing(c)
             c.timer.preview(remaining: 272, of: 600)
             c.engine.expand(tab: .home)
         },
-        Scene(name: "21-expanded-timer") { $0.engine.expand(tab: .timer) },
-        Scene(name: "22-expanded-timer-running") { c in
+        Scene(name: "18-expanded-timer") { $0.engine.expand(tab: .timer) },
+        Scene(name: "19-expanded-timer-running") { c in
             c.timer.preview(remaining: 272, of: 600)
             c.engine.expand(tab: .timer)
         },
-        Scene(name: "23-expanded-shelf") { $0.engine.expand(tab: .shelf) },
+        Scene(name: "20-expanded-shelf") { $0.engine.expand(tab: .shelf) },
     ]
 
     private static func playing(_ c: IsleContainer) {

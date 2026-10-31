@@ -14,8 +14,6 @@ final class IsleContainer {
     let timer = TimerModel()
     let calendar = CalendarModel()
     let power = PowerMonitor()
-    let volume = VolumeMonitor()
-    let brightness = BrightnessMonitor()
     let privacy = PrivacyMonitor()
     let shelf: ShelfModel
 
@@ -53,10 +51,6 @@ final class IsleContainer {
         power.post = post
         power.powerAlerts = { p.powerAlerts }
         power.lowBatteryAlerts = { p.lowBatteryAlerts }
-        volume.post = post
-        volume.isEnabled = { p.volumeAlerts }
-        brightness.post = post
-        brightness.isEnabled = { p.brightnessAlerts }
         capsLock.post = post
         capsLock.isEnabled = { p.capsLockAlerts }
         bluetooth.post = post
@@ -83,8 +77,6 @@ final class IsleContainer {
     func start() {
         nowPlayingService.start()
         power.start()
-        volume.start()
-        brightness.start()
         capsLock.start()
         privacy.start()
         bluetooth.start()
@@ -105,8 +97,6 @@ extension View {
             .environment(c.timer)
             .environment(c.calendar)
             .environment(c.power)
-            .environment(c.volume)
-            .environment(c.brightness)
             .environment(c.privacy)
             .environment(c.shelf)
             .environment(\.openIsleSettings, OpenSettingsAction { c.openSettings() })

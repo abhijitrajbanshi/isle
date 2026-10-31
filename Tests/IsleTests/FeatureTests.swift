@@ -272,11 +272,11 @@ struct PreferencesTests {
         #expect(preferences.expandOnHover)
         preferences.style = .black
         preferences.hoverDelay = 0.3
-        preferences.volumeAlerts = false
+        preferences.capsLockAlerts = false
         let reloaded = Preferences(defaults: defaults)
         #expect(reloaded.style == .black)
         #expect(reloaded.hoverDelay == 0.3)
-        #expect(!reloaded.volumeAlerts)
+        #expect(!reloaded.capsLockAlerts)
     }
 }
 

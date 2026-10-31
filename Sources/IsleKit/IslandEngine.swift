@@ -93,7 +93,7 @@ public final class IslandEngine {
         }
         if let current = alert {
             if current.kind == new.kind {
-                alert = new                       // update in place, e.g. volume ticks
+                alert = new                       // update in place, e.g. Caps Lock on → off
                 scheduleDismissal(after: new.duration)
                 return
             }

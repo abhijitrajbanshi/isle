@@ -50,9 +50,9 @@ struct PresentationTests {
 struct AlertTests {
     @Test func sameKindUpdatesInPlace() {
         let engine = IslandEngine()
-        engine.present(.volume(level: 0.2, muted: false))
-        engine.present(.volume(level: 0.3, muted: false))
-        #expect(engine.alert == .volume(level: 0.3, muted: false))
+        engine.present(.capsLock(isOn: true))
+        engine.present(.capsLock(isOn: false))
+        #expect(engine.alert == .capsLock(isOn: false))
     }
 
     @Test func bannersQueueAndShowInTurn() async {
@@ -87,8 +87,8 @@ struct AlertTests {
     @Test func hudsPreemptBanners() {
         let engine = IslandEngine()
         engine.present(.lowBattery(level: 10))
-        engine.present(.volume(level: 0.5, muted: false))
-        #expect(engine.alert == .volume(level: 0.5, muted: false))
+        engine.present(.capsLock(isOn: true))
+        #expect(engine.alert == .capsLock(isOn: true))
     }
 
     @Test func alertsDismissThemselves() async {
@@ -127,8 +127,8 @@ struct AlertTests {
     @Test func hudInterruptsBannerThenBannerReturns() async {
         let engine = IslandEngine(sleep: longWaitsBlock)
         engine.present(.lowBattery(level: 10))
-        engine.present(.volume(level: 0.4, muted: false))
-        #expect(engine.alert == .volume(level: 0.4, muted: false))
+        engine.present(.capsLock(isOn: true))
+        #expect(engine.alert == .capsLock(isOn: true))
         engine.dismissAlert()
         await settle()
         #expect(engine.alert == .lowBattery(level: 10))
@@ -139,7 +139,7 @@ struct AlertTests {
         let engine = IslandEngine(sleep: longWaitsBlock)
         engine.expand()
         engine.present(.lowBattery(level: 10))
-        engine.present(.volume(level: 0.4, muted: false))   // momentary: dropped
+        engine.present(.capsLock(isOn: true))   // momentary: dropped
         #expect(engine.presentation == .expanded)
         engine.collapse()
         await settle()

@@ -273,41 +273,6 @@ struct RingView<Center: View>: View {
     }
 }
 
-// MARK: - Level bar
-
-/// Draggable level (volume, brightness). Thickens under the pointer.
-struct LevelBar: View {
-    var level: Double
-    var tint: Color = .white
-    var onChange: ((Double) -> Void)?
-    @State private var isDragging = false
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Palette.fill)
-                Capsule().fill(tint).frame(width: max(geo.size.height, geo.size.width * level))
-            }
-            .frame(height: isDragging ? 7 : 5)
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    isDragging = true
-                    onChange?(max(0, min(1, value.location.x / geo.size.width)))
-                }
-                .onEnded { _ in isDragging = false })
-        }
-        .animation(Motion.snappy, value: level)
-        .animation(Motion.snappy, value: isDragging)
-        .accessibilityElement()
-        .accessibilityValue("\(Int(level * 100)) percent")
-        .accessibilityAdjustableAction { direction in
-            onChange?(max(0, min(1, level + (direction == .increment ? 0.0625 : -0.0625))))
-        }
-    }
-}
-
 // MARK: - Marquee
 
 /// Single-line text that scrolls when it overflows, with soft edges.

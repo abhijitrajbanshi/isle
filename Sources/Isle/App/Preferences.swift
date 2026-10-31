@@ -21,8 +21,6 @@ final class Preferences {
     var calendar: Bool { didSet { save(calendar, "calendar") } }
     var privacyIndicators: Bool { didSet { save(privacyIndicators, "privacyIndicators") } }
 
-    var volumeAlerts: Bool { didSet { save(volumeAlerts, "volumeAlerts") } }
-    var brightnessAlerts: Bool { didSet { save(brightnessAlerts, "brightnessAlerts") } }
     var capsLockAlerts: Bool { didSet { save(capsLockAlerts, "capsLockAlerts") } }
     var powerAlerts: Bool { didSet { save(powerAlerts, "powerAlerts") } }
     var lowBatteryAlerts: Bool { didSet { save(lowBatteryAlerts, "lowBatteryAlerts") } }
@@ -47,8 +45,6 @@ final class Preferences {
         allPlayers = bool("allPlayers")
         calendar = bool("calendar")
         privacyIndicators = bool("privacyIndicators")
-        volumeAlerts = bool("volumeAlerts")
-        brightnessAlerts = bool("brightnessAlerts")
         capsLockAlerts = bool("capsLockAlerts")
         powerAlerts = bool("powerAlerts")
         lowBatteryAlerts = bool("lowBatteryAlerts")

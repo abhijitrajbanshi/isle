@@ -86,7 +86,7 @@ Lifecycle events and errors (never per-track data) go to the unified log
 
 ## Energy
 
-Isle is event-driven: no global mouse monitoring, no polling for brightness,
+Isle is event-driven: no global mouse monitoring, no polling for
 camera/microphone, calendar or players, and the waveform animates in the window
 server. At rest it measures 0.0% CPU and an energy impact of 0.0. Decorative
 motion holds still under Low Power Mode and Reduce Motion.

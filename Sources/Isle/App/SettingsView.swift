@@ -7,7 +7,6 @@ struct SettingsView: View {
     @Environment(IslandEngine.self) private var engine
     @Environment(CalendarModel.self) private var calendar
     @Environment(PowerMonitor.self) private var power
-    @Environment(VolumeMonitor.self) private var volume
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -78,8 +77,6 @@ struct SettingsView: View {
             }
 
             Section("Alerts") {
-                Toggle("Volume", isOn: $p.volumeAlerts)
-                Toggle("Brightness", isOn: $p.brightnessAlerts)
                 Toggle("Caps Lock", isOn: $p.capsLockAlerts)
                 Toggle("Charging and Low Power Mode", isOn: $p.powerAlerts)
                 Toggle("Low battery", isOn: $p.lowBatteryAlerts)
@@ -100,7 +97,6 @@ struct SettingsView: View {
         let alerts: [IslandAlert] = [
             .power(level: level, isCharging: true),
             .device(DeviceInfo(name: "AirPods Pro", symbol: "airpodspro", battery: 86, isConnected: true)),
-            .volume(level: volume.volume, muted: false),
             .capsLock(isOn: true),
             .lowBattery(level: 10),
         ]

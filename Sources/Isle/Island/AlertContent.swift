@@ -35,16 +35,6 @@ private struct AlertLeading: View {
 
     var body: some View {
         switch alert {
-        case .volume(let level, let muted):
-            Image(systemName: muted ? "speaker.slash.fill" : speakerSymbol(level))
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(muted ? Palette.red : .white)
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 22, alignment: .leading)
-        case .brightness(let level):
-            Image(systemName: level < 0.35 ? "sun.min.fill" : "sun.max.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .contentTransition(.symbolEffect(.replace))
         case .capsLock(let on):
             Image(systemName: on ? "capslock.fill" : "capslock")
                 .font(.system(size: 14, weight: .semibold))
@@ -72,32 +62,13 @@ private struct AlertLeading: View {
             EmptyView()
         }
     }
-
-    private func speakerSymbol(_ level: Double) -> String {
-        switch level {
-        case ..<0.01: "speaker.fill"
-        case ..<0.34: "speaker.wave.1.fill"
-        case ..<0.67: "speaker.wave.2.fill"
-        default: "speaker.wave.3.fill"
-        }
-    }
 }
 
 private struct AlertTrailing: View {
-    @Environment(VolumeMonitor.self) private var volume
-    @Environment(BrightnessMonitor.self) private var brightness
     let alert: IslandAlert
 
     var body: some View {
         switch alert {
-        case .volume(let level, let muted):
-            if muted {
-                Text("Silent").font(.island(13, .semibold)).foregroundStyle(Palette.red)
-            } else {
-                LevelBar(level: level) { volume.setVolume($0) }.frame(width: 60, height: 14)
-            }
-        case .brightness(let level):
-            LevelBar(level: level) { brightness.setLevel($0) }.frame(width: 60, height: 14)
         case .capsLock(let on):
             Text(on ? "On" : "Off")
                 .font(.island(13, .semibold))
