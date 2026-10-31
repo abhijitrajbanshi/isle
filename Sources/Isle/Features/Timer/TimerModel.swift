@@ -22,6 +22,14 @@ final class TimerModel {
 
     var isActive: Bool { state != .idle }
     var isRunning: Bool { if case .running = state { true } else { false } }
+    /// When a running timer fires; nil while paused or idle.
+    var end: Date? { if case .running(let end) = state { end } else { nil } }
+
+    /// Seconds to show for `remaining`: rounded up like the Clock app, but
+    /// tolerant of floating-point noise on whole-second ticks.
+    static func displayed(_ remaining: TimeInterval) -> TimeInterval {
+        max(0, (remaining - 0.001).rounded(.up))
+    }
 
     func remaining(at date: Date = .now) -> TimeInterval {
         switch state {

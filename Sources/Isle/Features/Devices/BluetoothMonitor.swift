@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IOBluetooth
 import IsleKit
 
@@ -11,22 +11,34 @@ final class BluetoothMonitor: NSObject {
 
     private var connectNotification: IOBluetoothUserNotification?
     private var disconnectNotifications: [String: IOBluetoothUserNotification] = [:]
-    private let launchedAt = Date.now
+    /// No alerts until then: at launch IOBluetooth replays connected devices,
+    /// and around sleep keyboards and mice drop and reconnect by themselves.
+    private var quietUntil = Date.now.addingTimeInterval(3)
 
     func start() {
         connectNotification = IOBluetoothDevice.register(forConnectNotifications: self,
                                                          selector: #selector(connected(_:device:)))
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.quietUntil = .distantFuture }
+        }
+        workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.quietUntil = .now.addingTimeInterval(8) }
+        }
     }
+
+    private var isQuiet: Bool { Date.now < quietUntil }
 
     @objc private func connected(_ note: IOBluetoothUserNotification, device: IOBluetoothDevice) {
         let key = device.addressString ?? UUID().uuidString
         disconnectNotifications[key] = device.register(forDisconnectNotification: self,
                                                        selector: #selector(disconnected(_:device:)))
-        // IOBluetooth replays already-connected devices at registration
-        guard Date.now.timeIntervalSince(launchedAt) > 3 else { return }
+        guard !isQuiet else { return }
         // AirPods publish battery a moment after the link comes up
         Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(1200))
+            // a link that dropped again meanwhile already showed "Disconnected"
+            guard device.isConnected() else { return }
             self?.announce(device, connected: true)
         }
     }
@@ -34,6 +46,7 @@ final class BluetoothMonitor: NSObject {
     @objc private func disconnected(_ note: IOBluetoothUserNotification, device: IOBluetoothDevice) {
         note.unregister()
         if let key = device.addressString { disconnectNotifications[key] = nil }
+        guard !isQuiet else { return }
         announce(device, connected: false)
     }
 

@@ -18,6 +18,10 @@ final class NowPlayingService {
     private var bridgeHasTrack = false
     private var bridgeRestarts = 0
     private var observers: [NSObjectProtocol] = []
+    private var emptyTask: Task<Void, Never>?
+    /// Players report "nothing playing" for a moment between tracks;
+    /// only a longer silence ends the activity.
+    private let emptyGrace: Duration = .milliseconds(1500)
 
     init(model: NowPlayingModel, preferences: Preferences) {
         self.model = model
@@ -48,6 +52,8 @@ final class NowPlayingService {
             bridge.start()
         } else if !wanted, bridge.isRunning {
             bridge.stop()
+            emptyTask?.cancel()
+            emptyTask = nil
             bridgeHasTrack = false
             if source == .bridge { model.clear(); source = .none }
             refreshScripts()
@@ -107,10 +113,19 @@ final class NowPlayingService {
         case "ready":
             break
         case "info" where message.empty == true:
-            bridgeHasTrack = false
-            if source == .bridge { model.clear(); source = .none }
-            refreshScripts()
+            guard bridgeHasTrack else { refreshScripts(); return }
+            guard emptyTask == nil else { return }
+            emptyTask = Task { [weak self, emptyGrace] in
+                try? await Task.sleep(for: emptyGrace)
+                guard !Task.isCancelled, let self else { return }
+                self.emptyTask = nil
+                self.bridgeHasTrack = false
+                if self.source == .bridge { self.model.clear(); self.source = .none }
+                self.refreshScripts()
+            }
         case "info":
+            emptyTask?.cancel()
+            emptyTask = nil
             bridgeHasTrack = true
             source = .bridge
             let previous = model.track
@@ -126,7 +141,7 @@ final class NowPlayingService {
             } else if message.artworkKey == nil, model.track != previous {
                 // players drop artwork for a moment around play/pause;
                 // only a new track without artwork clears it
-                model.setArtwork(nil, key: nil)
+                model.artworkUnavailable()
             }
         default:
             break
@@ -134,6 +149,8 @@ final class NowPlayingService {
     }
 
     private func bridgeExited(after uptime: TimeInterval) {
+        emptyTask?.cancel()
+        emptyTask = nil
         bridgeHasTrack = false
         if source == .bridge { model.clear(); source = .none }
         refreshScripts()

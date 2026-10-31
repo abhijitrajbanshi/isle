@@ -7,8 +7,8 @@ struct TimerCountdown: View {
     var weight: Font.Weight = .semibold
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
-            Text(Clock.string(timer.remaining(at: context.date).rounded(.up)))
+        TimelineView(CountdownSchedule(end: timer.end)) { context in
+            Text(Clock.string(TimerModel.displayed(timer.remaining(at: context.date))))
                 .font(.islandNumber(size, weight))
                 .foregroundStyle(Palette.orange)
                 .contentTransition(.numericText(countsDown: true))
@@ -34,7 +34,7 @@ struct TimerBubble: View {
     @Environment(TimerModel.self) private var timer
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
+        TimelineView(CountdownSchedule(end: timer.end)) { context in
             RingView(progress: timer.fraction(at: context.date), color: Palette.orange, lineWidth: 2.4) {
                 Image(systemName: timer.isRunning ? "timer" : "pause.fill")
                     .font(.system(size: 9, weight: .bold))
@@ -71,7 +71,7 @@ struct TimerTab: View {
     var body: some View {
         if timer.isActive {
             HStack(spacing: 20) {
-                TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
+                TimelineView(CountdownSchedule(end: timer.end)) { context in
                     RingView(progress: timer.fraction(at: context.date), color: Palette.orange, lineWidth: 6) {
                         Image(systemName: timer.isRunning ? "timer" : "pause.fill")
                             .font(.system(size: 20, weight: .semibold))
@@ -137,5 +137,23 @@ private struct PresetButton: View {
         .onHover { isHovering = $0 }
         .animation(Motion.snappy, value: isHovering)
         .accessibilityLabel(isHour ? "1 hour" : "\(Int(seconds / 60)) minutes")
+    }
+}
+
+/// Ticks on the countdown's own whole seconds, so the display changes the
+/// moment the remaining time does and reads 0:00 when the timer fires.
+/// A paused (or idle) timer doesn't tick at all.
+struct CountdownSchedule: TimelineSchedule {
+    let end: Date?
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+        guard let end, end > startDate else { return AnyIterator([startDate].makeIterator()) }
+        // the latest whole-second boundary at or before startDate
+        var next = end.addingTimeInterval(-end.timeIntervalSince(startDate).rounded(.up))
+        return AnyIterator {
+            guard next <= end else { return nil }
+            defer { next = next.addingTimeInterval(1) }
+            return next
+        }
     }
 }

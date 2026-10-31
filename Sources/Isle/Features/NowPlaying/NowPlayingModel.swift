@@ -40,7 +40,12 @@ final class NowPlayingModel {
     /// they confirm the change (or this deadline passes) those reports are
     /// stale and would flip the button back and forth.
     @ObservationIgnored private var expectedPlaying: (value: Bool, until: Date)?
+    /// Same for a seek: players keep reporting the old position for a moment.
+    @ObservationIgnored private var expectedPosition: (value: Double, until: Date)?
     @ObservationIgnored var toggleSettleTime: TimeInterval = 1.5
+    @ObservationIgnored private var artworkClearTask: Task<Void, Never>?
+    /// How long the previous track's artwork stays while the next one's loads.
+    @ObservationIgnored var artworkGrace: Duration = .seconds(1)
     /// How long a paused track stays in the notch.
     @ObservationIgnored var lingerDuration: Duration = .seconds(60)
 
@@ -86,6 +91,7 @@ final class NowPlayingModel {
 
     func seek(to seconds: Double) {
         anchor = (seconds, .now, anchor.rate)
+        expectedPosition = (seconds, .now + toggleSettleTime)
         perform(.seek(seconds))
     }
 
@@ -117,6 +123,13 @@ final class NowPlayingModel {
 
         let speed = rate > 0 ? rate : 1
         let position = elapsed + (playing ? Date.now.timeIntervalSince(timestamp) * speed : 0)
+        if let expected = expectedPosition {
+            if abs(position - self.elapsed()) < 2 || isNewTrack || Date.now > expected.until {
+                expectedPosition = nil
+            } else {
+                return // stale position from before the seek
+            }
+        }
         // ignore sub-second drift so views don't redraw for nothing
         if isNewTrack || abs(position - self.elapsed()) > 0.75 || anchor.rate != speed || anchor.date == .distantPast {
             anchor = (position, .now, speed)
@@ -126,6 +139,8 @@ final class NowPlayingModel {
     func setArtwork(_ data: Data?, key: String?) {
         guard key != artworkKey || key == nil else { return }
         artworkKey = key
+        artworkClearTask?.cancel()
+        artworkClearTask = nil
         guard let data, let image = NSImage(data: data) else {
             artwork = nil
             accent = .white
@@ -139,12 +154,30 @@ final class NowPlayingModel {
         }
     }
 
+    /// The new track has no artwork (yet). Keeps the previous artwork
+    /// briefly, since it usually arrives a moment after the title, instead
+    /// of flashing the placeholder on every skip.
+    func artworkUnavailable() {
+        artworkKey = nil
+        guard artwork != nil, artworkClearTask == nil else { return }
+        artworkClearTask = Task { [weak self, artworkGrace] in
+            try? await Task.sleep(for: artworkGrace)
+            guard !Task.isCancelled, let self else { return }
+            self.artworkClearTask = nil
+            self.artwork = nil
+            self.accent = .white
+        }
+    }
+
     var hasArtworkKey: Bool { artworkKey != nil }
 
     func clear() {
         lingerTask?.cancel()
         pauseExpired = false
         expectedPlaying = nil
+        expectedPosition = nil
+        artworkClearTask?.cancel()
+        artworkClearTask = nil
         guard track != nil else { return }
         track = nil
         isPlaying = false

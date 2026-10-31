@@ -35,13 +35,20 @@ struct ArtworkView: View {
         ZStack {
             if let image {
                 Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+                    .id(ObjectIdentifier(image))
+                    .transition(.opacity)
             } else {
-                LinearGradient(colors: [Color(white: 0.24), Color(white: 0.13)], startPoint: .top, endPoint: .bottom)
-                Image(systemName: "music.note")
-                    .font(.system(size: size * 0.4, weight: .medium))
-                    .foregroundStyle(Palette.secondaryLabel)
+                Group {
+                    LinearGradient(colors: [Color(white: 0.24), Color(white: 0.13)], startPoint: .top, endPoint: .bottom)
+                    Image(systemName: "music.note")
+                        .font(.system(size: size * 0.4, weight: .medium))
+                        .foregroundStyle(Palette.secondaryLabel)
+                }
+                .transition(.opacity)
             }
         }
+        // crossfade between tracks instead of an abrupt swap
+        .animation(.easeInOut(duration: 0.25), value: image.map(ObjectIdentifier.init))
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {

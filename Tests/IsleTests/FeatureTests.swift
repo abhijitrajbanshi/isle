@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import IsleKit
 import Testing
 @testable import Isle
@@ -128,6 +128,38 @@ struct NowPlayingModelTests {
         #expect(model.isPlaying)
     }
 
+    /// Regression: the old position, reported just after a seek, snapped
+    /// the scrubber back before it jumped forward again.
+    @Test func stalePositionAfterSeekIsIgnored() {
+        let model = NowPlayingModel()
+        model.update(track: track, isPlaying: false, elapsed: 10, timestamp: .now)
+        model.seek(to: 120)
+        model.update(track: track, isPlaying: false, elapsed: 10, timestamp: .now)
+        #expect(abs(model.elapsed() - 120) < 0.5)
+        model.update(track: track, isPlaying: false, elapsed: 120.3, timestamp: .now)
+        // confirmed: later reports are trusted again
+        model.update(track: track, isPlaying: false, elapsed: 30, timestamp: .now)
+        #expect(abs(model.elapsed() - 30) < 0.5)
+    }
+
+    /// Regression: every skip flashed the placeholder before the new artwork.
+    @Test func artworkSurvivesUntilTheNextArrives() async throws {
+        let model = NowPlayingModel()
+        model.artworkGrace = .milliseconds(40)
+        let png = try #require(NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in
+            NSColor.red.setFill(); rect.fill(); return true
+        }.tiffRepresentation)
+        model.setArtwork(png, key: "a")
+        model.artworkUnavailable()
+        #expect(model.artwork != nil)
+        model.setArtwork(png, key: "b")
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(model.artwork != nil)
+        model.artworkUnavailable()
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(model.artwork == nil)
+    }
+
     @Test func clearRemovesTrack() {
         let model = NowPlayingModel()
         model.update(track: track, isPlaying: true, elapsed: 0, timestamp: .now)
@@ -162,6 +194,16 @@ struct TimerModelTests {
         timer.start(0.05)
         try await Task.sleep(for: .milliseconds(300))
         #expect(finished && !timer.isActive)
+    }
+
+    @Test func countdownTicksOnWholeSeconds() {
+        let now = Date.now
+        let end = now.addingTimeInterval(3.4)
+        let ticks = Array(CountdownSchedule(end: end).entries(from: now, mode: .normal))
+        #expect(ticks.count == 5) // through 0:00, when it fires
+        #expect(ticks.first! <= now)
+        #expect(ticks.map { TimerModel.displayed(end.timeIntervalSince($0)) } == [4, 3, 2, 1, 0].map(Double.init))
+        #expect(Array(CountdownSchedule(end: nil).entries(from: now, mode: .normal)) == [now])
     }
 
     @Test func fractionCountsDown() {
