@@ -3,6 +3,8 @@ import IsleKit
 import Observation
 import SwiftUI
 
+private let log = Diagnostics(category: "Island")
+
 /// Hosts the island and translates system input into engine events.
 ///
 /// Energy: Isle never watches the mouse globally. A sensor window over the
@@ -22,6 +24,9 @@ final class IslandWindowController {
     private var observers: [NSObjectProtocol] = []
     private var swipe = SwipeInterpreter()
     private var verifyTask: Task<Void, Never>?
+    private var fullScreenCheck: Task<Void, Never>?
+    /// The display the island is on.
+    private var screen: NSScreen?
 
     /// Panel size: large enough for the expanded island plus its shadow.
     private static let canvas = CGSize(width: 840, height: 280)
@@ -45,6 +50,7 @@ final class IslandWindowController {
         observeSystem()
         installEventMonitors()
         trackHitArea()
+        observeNowPlayingForFullScreen()
     }
 
     // MARK: Placement
@@ -55,6 +61,7 @@ final class IslandWindowController {
             sensor.orderOut(nil)
             return
         }
+        self.screen = screen
         let metrics = ScreenLocator.metrics(for: screen)
         if engine.metrics != metrics { engine.metrics = metrics }
         let frame = CGRect(x: (screen.frame.midX - Self.canvas.width / 2).rounded(),
@@ -63,6 +70,50 @@ final class IslandWindowController {
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         orderFront()
         syncHitArea()
+        checkFullScreen("placement")
+    }
+
+    // MARK: Full screen
+
+    /// Re-checks whether the app playing media fills the island's display.
+    /// Event-driven only (Space and app switches, track changes, clicks in
+    /// the player): it looks now, and once more after the full-screen
+    /// animation has settled. Nothing runs between events.
+    private func checkFullScreen(_ trigger: String) {
+        updateFullScreen(trigger)
+        fullScreenCheck?.cancel()
+        fullScreenCheck = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard !Task.isCancelled else { return }
+            self?.updateFullScreen(trigger + ", settled")
+        }
+    }
+
+    /// A new video (or a different player) may open straight into full screen.
+    private func observeNowPlayingForFullScreen() {
+        withObservationTracking {
+            _ = container.nowPlaying.track?.bundleID
+            _ = container.nowPlaying.track?.title
+            _ = container.nowPlaying.isActive
+            _ = container.preferences.hideInFullScreen
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.checkFullScreen("now playing changed")
+                self?.observeNowPlayingForFullScreen()
+            }
+        }
+    }
+
+    private func updateFullScreen(_ trigger: String) {
+        let player = container.nowPlaying
+        var kind: FullScreenDetector.Kind?
+        if container.preferences.hideInFullScreen, player.isActive, let id = player.track?.bundleID, let screen {
+            kind = FullScreenDetector.app(id, fills: screen)
+        }
+        let value = kind != nil
+        guard engine.isFullScreen != value else { return }
+        engine.isFullScreen = value
+        log.notice("full screen \(kind.map { "on (\($0.rawValue))" } ?? "off") after \(trigger)")
     }
 
     private func orderFront() {
@@ -83,7 +134,13 @@ final class IslandWindowController {
                 MainActor.assumeIsolated { self?.place() }
             },
             workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.orderFront() }
+                MainActor.assumeIsolated {
+                    self?.orderFront()
+                    self?.checkFullScreen("Space switch")
+                }
+            },
+            workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkFullScreen("app switch") }
             },
         ]
         observeDisplayPreference()
@@ -172,9 +229,18 @@ final class IslandWindowController {
         }) { monitors.append(local) }
     }
 
+    private func clickWasInPlayer() -> Bool {
+        guard container.preferences.hideInFullScreen, container.nowPlaying.isActive,
+              let id = container.nowPlaying.track?.bundleID else { return false }
+        return NowPlayingService.appBundleID(for: NSWorkspace.shared.frontmostApplication?.bundleIdentifier) == id
+    }
+
     private func handleGlobalClick(_ event: NSEvent) {
         if event.type == .leftMouseUp {
             engine.fileDragEnded()
+            // players with their own full screen (VLC) toggle it on a click
+            // or double-click, without switching Spaces
+            if clickWasInPlayer() { checkFullScreen("click in player") }
         } else if !engine.hitRect.contains(NSEvent.mouseLocation) {
             engine.clickedOutside()
         }

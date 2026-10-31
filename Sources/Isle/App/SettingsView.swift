@@ -63,6 +63,8 @@ struct SettingsView: View {
                     Text("Main display").tag(Preferences.DisplayChoice.main)
                 }
                 Toggle("Use on displays without a notch", isOn: $p.showOnDisplaysWithoutNotch)
+                Toggle("Hide live activities in full screen", isOn: $p.hideInFullScreen)
+                    .help("While a video or app is full screen, the island stays dark. Alerts still appear.")
             }
 
             Section {

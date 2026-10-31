@@ -29,6 +29,18 @@ struct PresentationTests {
         #expect(engine.presentation == .compact(primary: .timer, secondary: .nowPlaying))
     }
 
+    @Test func fullScreenHidesActivitiesButNotAlerts() {
+        let engine = IslandEngine()
+        engine.activities = { [.nowPlaying] }
+        engine.isFullScreen = true
+        #expect(engine.presentation == .idle)
+        engine.present(.lowBattery(level: 10))
+        #expect(engine.presentation == .alert(.lowBattery(level: 10)))
+        engine.dismissAlert()
+        engine.isFullScreen = false
+        #expect(engine.presentation == .compact(primary: .nowPlaying, secondary: nil))
+    }
+
     @Test func singleActivityHasNoBubble() {
         let engine = IslandEngine()
         engine.activities = { [.calendar] }
@@ -158,6 +170,17 @@ struct AlertTests {
 
 @MainActor
 struct PointerTests {
+    /// In full screen the pointer goes to the top for the menu bar, not the island.
+    @Test func fullScreenDoesNotExpandOnHover() async {
+        let engine = IslandEngine(sleep: instant)
+        engine.isFullScreen = true
+        engine.pointerMoved(inside: true)
+        await settle()
+        #expect(!engine.isExpanded)
+        engine.activate()
+        #expect(engine.isExpanded)
+    }
+
     @Test func hoverExpandsAfterDelay() async {
         let engine = IslandEngine(sleep: instant)
         engine.pointerMoved(inside: true)

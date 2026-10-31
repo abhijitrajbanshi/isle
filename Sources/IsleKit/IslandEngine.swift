@@ -36,6 +36,10 @@ public final class IslandEngine {
     // MARK: Configuration
 
     public var expandsOnHover = true
+    /// A full-screen app (a video, a game) fills the island's display: live
+    /// activities step aside and hovering doesn't open the island, since the
+    /// pointer goes up there for the menu bar. Alerts and clicks still work.
+    public var isFullScreen = false
     public var hoverDelay: Duration = .milliseconds(140)
     @ObservationIgnored public var timing = Timing()
     /// Live activities, highest priority first is not required; the engine sorts.
@@ -65,6 +69,7 @@ public final class IslandEngine {
     public var presentation: Presentation {
         if isExpanded { return .expanded }
         if let alert { return .alert(alert) }
+        if isFullScreen { return .idle }
         let live = activities().sorted(by: >)
         guard let primary = live.first else { return .idle }
         return .compact(primary: primary, secondary: live.dropFirst().first)
@@ -221,7 +226,7 @@ public final class IslandEngine {
             holdAlert()
             return
         }
-        guard !isExpanded, expandsOnHover else { return }
+        guard !isExpanded, expandsOnHover, !isFullScreen else { return }
         hoverTask?.cancel()
         hoverTask = Task { [weak self, sleep, hoverDelay] in
             try? await sleep(hoverDelay)

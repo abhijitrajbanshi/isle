@@ -14,6 +14,7 @@ final class Preferences {
     var showMenuBarIcon: Bool { didSet { save(showMenuBarIcon, "showMenuBarIcon") } }
     var display: DisplayChoice { didSet { save(display.rawValue, "display") } }
     var style: IslandStyle { didSet { save(style.rawValue, "islandStyle") } }
+    var hideInFullScreen: Bool { didSet { save(hideInFullScreen, "hideInFullScreen") } }
     var showOnDisplaysWithoutNotch: Bool { didSet { save(showOnDisplaysWithoutNotch, "showOnDisplaysWithoutNotch") } }
 
     var nowPlaying: Bool { didSet { save(nowPlaying, "nowPlaying") } }
@@ -40,6 +41,7 @@ final class Preferences {
         showMenuBarIcon = bool("showMenuBarIcon")
         display = DisplayChoice(rawValue: defaults.string(forKey: "display") ?? "") ?? .builtIn
         showOnDisplaysWithoutNotch = bool("showOnDisplaysWithoutNotch")
+        hideInFullScreen = bool("hideInFullScreen")
         style = IslandStyle(rawValue: defaults.string(forKey: "islandStyle") ?? "") ?? .glass
         nowPlaying = bool("nowPlaying")
         allPlayers = bool("allPlayers")
