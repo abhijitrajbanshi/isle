@@ -30,7 +30,8 @@ jobs:
         run: ./scripts/build.sh
 
       - name: Render island states
-        run: "$(swift build --show-bin-path)/Isle" --snapshots snapshots
+        run: |
+          "$(swift build --show-bin-path)/Isle" --snapshots snapshots
 
       - uses: actions/upload-artifact@v4
         with:
