@@ -1,0 +1,141 @@
+import SwiftUI
+
+/// Countdown text that ticks with a numeric content transition.
+struct TimerCountdown: View {
+    @Environment(TimerModel.self) private var timer
+    var size: CGFloat
+    var weight: Font.Weight = .semibold
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
+            Text(Clock.string(timer.remaining(at: context.date).rounded(.up)))
+                .font(.islandNumber(size, weight))
+                .foregroundStyle(Palette.orange)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(Motion.snappy, value: context.date)
+        }
+        .opacity(timer.isRunning ? 1 : 0.55)
+        .accessibilityLabel("Timer")
+    }
+}
+
+struct TimerCompactLeading: View {
+    @Environment(TimerModel.self) private var timer
+
+    var body: some View {
+        Image(systemName: timer.isRunning ? "timer" : "pause.fill")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Palette.orange)
+            .contentTransition(.symbolEffect(.replace))
+    }
+}
+
+struct TimerBubble: View {
+    @Environment(TimerModel.self) private var timer
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
+            RingView(progress: timer.fraction(at: context.date), color: Palette.orange, lineWidth: 2.4) {
+                Image(systemName: timer.isRunning ? "timer" : "pause.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Palette.orange)
+            }
+        }
+        .padding(6)
+    }
+}
+
+/// Compact card for the Home tab while a timer runs.
+struct TimerWidget: View {
+    @Environment(TimerModel.self) private var timer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Timer").font(.island(11, .semibold)).foregroundStyle(Palette.orange)
+            TimerCountdown(size: 30, weight: .medium)
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                IslandButton(symbol: "xmark", label: "Cancel", size: 11, weight: .bold,
+                             fill: Palette.fill, diameter: 30) { timer.cancel() }
+                IslandButton(symbol: timer.isRunning ? "pause.fill" : "play.fill",
+                             label: timer.isRunning ? "Pause" : "Resume", size: 11, tint: Palette.orange,
+                             fill: Palette.orange.opacity(0.22), diameter: 30) { timer.toggle() }
+            }
+        }
+    }
+}
+
+struct TimerTab: View {
+    @Environment(TimerModel.self) private var timer
+
+    var body: some View {
+        if timer.isActive {
+            HStack(spacing: 20) {
+                TimelineView(.animation(minimumInterval: 1, paused: !timer.isRunning)) { context in
+                    RingView(progress: timer.fraction(at: context.date), color: Palette.orange, lineWidth: 6) {
+                        Image(systemName: timer.isRunning ? "timer" : "pause.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(Palette.orange)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .animation(.linear(duration: 1), value: context.date)
+                }
+                .frame(width: 82, height: 82)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(Clock.string(timer.total)) timer")
+                        .font(.island(12, .medium)).foregroundStyle(Palette.secondaryLabel)
+                    TimerCountdown(size: 46, weight: .light)
+                }
+                Spacer(minLength: 0)
+                HStack(spacing: 10) {
+                    IslandButton(symbol: "plus", label: "Add a minute", size: 15, fill: Palette.fill, diameter: 46) {
+                        timer.addMinute()
+                    }
+                    IslandButton(symbol: "xmark", label: "Cancel", size: 15, fill: Palette.fill, diameter: 46) {
+                        timer.cancel()
+                    }
+                    IslandButton(symbol: timer.isRunning ? "pause.fill" : "play.fill",
+                                 label: timer.isRunning ? "Pause" : "Resume", size: 17, tint: Palette.orange,
+                                 fill: Palette.orange.opacity(0.22), diameter: 46) { timer.toggle() }
+                }
+            }
+            .frame(maxHeight: .infinity)
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Timer").font(.island(13, .semibold)).foregroundStyle(Palette.secondaryLabel)
+                HStack(spacing: 0) {
+                    ForEach(TimerModel.presets, id: \.self) { seconds in
+                        PresetButton(seconds: seconds) { timer.start(seconds) }
+                        if seconds != TimerModel.presets.last { Spacer(minLength: 6) }
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+}
+
+private struct PresetButton: View {
+    let seconds: TimeInterval
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        let isHour = seconds >= 3600
+        Button(action: action) {
+            VStack(spacing: -1) {
+                Text(isHour ? "1" : "\(Int(seconds / 60))").font(.islandNumber(18, .semibold))
+                Text(isHour ? "hr" : "min").font(.island(9.5, .medium)).opacity(0.7)
+            }
+            .foregroundStyle(Palette.orange)
+            .frame(width: 54, height: 54)
+            .background(Circle().fill(Palette.orange.opacity(isHovering ? 0.28 : 0.17)))
+            .contentShape(Circle())
+        }
+        .buttonStyle(PressableStyle())
+        .onHover { isHovering = $0 }
+        .animation(Motion.snappy, value: isHovering)
+        .accessibilityLabel(isHour ? "1 hour" : "\(Int(seconds / 60)) minutes")
+    }
+}

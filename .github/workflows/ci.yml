@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and history for version stamping
+
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Build app
+        run: ./scripts/build.sh
+
+      - name: Render island states
+        run: "$(swift build --show-bin-path)/Isle" --snapshots snapshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: island-snapshots
+          path: snapshots
+
+      - name: Package
+        run: ditto -c -k --keepParent build/Isle.app build/Isle.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Isle-app
+          path: build/Isle.zip
