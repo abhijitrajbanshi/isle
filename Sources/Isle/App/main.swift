@@ -11,6 +11,11 @@ MainActor.assumeIsolated {
         SnapshotRenderer.run(into: URL(fileURLWithPath: directory))
         exit(0)
     }
+    if let index = CommandLine.arguments.firstIndex(of: "--demo") {
+        // Scripted tour in a window, for recording the showcase video.
+        let style = CommandLine.arguments.dropFirst(index + 1).first.flatMap(IslandStyle.init) ?? .glass
+        DemoReel.run(style: style)
+    }
 
     let app = NSApplication.shared
     let delegate = AppDelegate()

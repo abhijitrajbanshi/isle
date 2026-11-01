@@ -93,7 +93,7 @@ enum SnapshotRenderer {
                              artwork: artwork, accent: accent)
     }
 
-    private static let accent = Color(red: 1.0, green: 0.45, blue: 0.62)
+    static let accent = Color(red: 1.0, green: 0.45, blue: 0.62)
 
     private static let sampleEvents: [CalendarModel.Event] = [
         .init(id: "1", title: "Design review", start: .now.addingTimeInterval(3600 * 2),
@@ -103,7 +103,7 @@ enum SnapshotRenderer {
     ]
 
     /// Synthetic album art: a warm gradient with a sun.
-    private static let artwork: NSImage = {
+    static let artwork: NSImage = {
         NSImage(size: NSSize(width: 300, height: 300), flipped: false) { rect in
             NSGradient(colors: [NSColor(calibratedRed: 0.98, green: 0.36, blue: 0.55, alpha: 1),
                                 NSColor(calibratedRed: 0.36, green: 0.16, blue: 0.62, alpha: 1)])!

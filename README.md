@@ -4,6 +4,11 @@ The iPhone Dynamic Island, for the MacBook notch. Native Swift + SwiftUI,
 Apple Silicon, macOS 14 or later. See [FEATURES.md](FEATURES.md) for the full
 feature list.
 
+![Isle: music, the opened player, a timer beside the music, and AirPods, charging and Caps Lock alerts](docs/demo-black.gif)
+
+Also in [Liquid Glass](docs/demo-glass.gif), and as full-resolution video:
+[Black](docs/demo-black.mp4) · [Liquid Glass](docs/demo-glass.mp4).
+
 ## Install
 
 1. Download **Isle-x.y.z.zip** from the
@@ -63,6 +68,7 @@ injected sleep.
 ```bash
 swift test                                   # IsleKit engine tests + app feature tests
 .build/debug/Isle --snapshots ./snapshots    # render every island state to PNG
+build/Isle.app/Contents/MacOS/Isle --demo black  # play the showcase tour in a window, to record (or glass)
 ```
 
 ## Release
