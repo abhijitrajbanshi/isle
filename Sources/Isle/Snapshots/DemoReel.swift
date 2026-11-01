@@ -17,9 +17,10 @@ enum DemoReel {
         preferences.style = style
         let c = IsleContainer(preferences: preferences, metrics: .preview, defaults: defaults)
         c.power.preview(level: 82, charging: false)
-        c.calendar.preview([.init(id: "1", title: "Design review", start: .now.addingTimeInterval(3600 * 2),
-                                  end: .now.addingTimeInterval(3600 * 3),
-                                  color: IslandColor(red: 0.35, green: 0.5, blue: 1))])
+        let event = CalendarModel.Event(id: "1", title: "Design review", start: Date.now.addingTimeInterval(7200),
+                                        end: Date.now.addingTimeInterval(10_800),
+                                        color: IslandColor(red: 0.35, green: 0.5, blue: 1))
+        c.calendar.preview([event])
 
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
