@@ -24,6 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         observeMenuBarPreference()
     }
 
+    /// Opening Isle again (from Finder, Spotlight or the Dock) shows Settings:
+    /// there's no window otherwise, and nothing would seem to happen.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         container?.stop()
     }

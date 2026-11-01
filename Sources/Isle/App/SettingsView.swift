@@ -2,42 +2,271 @@ import IsleKit
 import ServiceManagement
 import SwiftUI
 
+/// Settings in the System Settings style: a sidebar of panes, one per part
+/// of Isle, agents first.
 struct SettingsView: View {
+    enum Pane: String, CaseIterable, Identifiable {
+        case agents, calls, music, island, alerts, general
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .agents: "Agents"
+            case .calls: "Calls & Calendar"
+            case .music: "Music"
+            case .island: "Island"
+            case .alerts: "Alerts"
+            case .general: "General"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .agents: "terminal.fill"
+            case .calls: "video.fill"
+            case .music: "music.note"
+            case .island: "capsule.fill"
+            case .alerts: "bell.badge.fill"
+            case .general: "gearshape.fill"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .agents: Color(red: 0.96, green: 0.6, blue: 0.14)
+            case .calls: Color(red: 0.2, green: 0.72, blue: 0.42)
+            case .music: Color(red: 0.98, green: 0.3, blue: 0.4)
+            case .island: Color(white: 0.18)
+            case .alerts: Color(red: 0.95, green: 0.3, blue: 0.25)
+            case .general: Color(white: 0.55)
+            }
+        }
+    }
+
+    @State private var pane: Pane = .agents
+
+    var body: some View {
+        NavigationSplitView {
+            List(Pane.allCases, selection: $pane) { pane in
+                Label {
+                    Text(pane.title)
+                } icon: {
+                    Image(systemName: pane.symbol)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(pane.tint.gradient))
+                }
+                .padding(.vertical, 2)
+            }
+            .navigationSplitViewColumnWidth(196)
+            .safeAreaInset(edge: .top) { SidebarHeader().padding(.horizontal, 14).padding(.bottom, 6) }
+        } detail: {
+            Group {
+                switch pane {
+                case .agents: AgentsPane()
+                case .calls: CallsPane()
+                case .music: MusicPane()
+                case .island: IslandPane()
+                case .alerts: AlertsPane()
+                case .general: GeneralPane()
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(pane.title)
+        }
+        .frame(width: 720, height: 540)
+    }
+}
+
+private struct SidebarHeader: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Isle").font(.headline)
+                Text(Updater.currentVersion).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+// MARK: Agents
+
+private struct AgentsPane: View {
     @Environment(Preferences.self) private var preferences
-    @Environment(IslandEngine.self) private var engine
-    @Environment(CalendarModel.self) private var calendar
-    @Environment(PowerMonitor.self) private var power
-    @Environment(Updater.self) private var updater
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var claudeConnected = ClaudeConnector.isConnected
-    @State private var claudeError: String?
+    @State private var connected = ClaudeConnector.isConnected
+    @State private var error: String?
+    @State private var copied = false
 
     var body: some View {
         @Bindable var p = preferences
-        @Bindable var u = updater
         Form {
             Section {
-                Header()
+                HStack(spacing: 14) {
+                    Image(systemName: "terminal.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(.black))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Claude Code").font(.headline)
+                        Text(connected ? "Sessions report to the notch, in the app and the terminal."
+                                       : "See what Claude is doing and answer its requests from the notch.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    if connected {
+                        Menu {
+                            Button("Disconnect") { change(ClaudeConnector.disconnect) }
+                        } label: {
+                            Label("Connected", systemImage: "checkmark.circle.fill")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .foregroundStyle(.green)
+                    } else {
+                        Button("Connect") { change(ClaudeConnector.connect) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(.vertical, 4)
+                if let error {
+                    Text(error).foregroundStyle(.red).font(.callout)
+                }
+            } footer: {
+                Note("Connecting adds Isle's hooks to ~/.claude/settings.json and keeps a backup next to it. If you don't answer a request within 45 seconds, or Claude's own window is in front, Claude asks you as usual.")
             }
 
-            Section("Behaviour") {
-                Toggle("Open at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in
-                        do {
-                            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-                        } catch {
-                            launchAtLogin = SMAppService.mainApp.status == .enabled
+            Section {
+                Toggle("Show agents in the notch", isOn: $p.agents)
+                Toggle("Open the island when an agent needs permission", isOn: $p.openForRequests)
+                    .disabled(!p.agents)
+            }
+
+            Section {
+                LabeledContent("Command") {
+                    HStack(spacing: 8) {
+                        Text("isle").font(.system(.body, design: .monospaced))
+                        Button(copied ? "Copied" : "Copy Path") {
+                            let path = ClaudeConnector.helperPath ?? "/Applications/Isle.app/Contents/Helpers/isle"
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(path, forType: .string)
+                            copied = true
                         }
                     }
-                Toggle("Expand on hover", isOn: $p.expandOnHover)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Example(command: "isle run -- make release", note: "live while it runs, ✓ or ✗ when it ends")
+                    Example(command: "isle progress upload 0.4 --title Upload", note: "a progress ring in the notch")
+                    Example(command: "isle done upload", note: "finish it")
+                }
+                .padding(.vertical, 2)
+            } header: {
+                Text("Scripts and builds")
+            } footer: {
+                Note("Anything you run can report to the notch. When Isle isn't running, these do nothing.")
+            }
+        }
+    }
+
+    private func change(_ action: () throws -> Void) {
+        do {
+            try action()
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+        connected = ClaudeConnector.isConnected
+    }
+}
+
+private struct Example: View {
+    let command: String
+    let note: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(command).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+            Text(note).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: Calls & Calendar
+
+private struct CallsPane: View {
+    @Environment(Preferences.self) private var preferences
+    @Environment(CalendarModel.self) private var calendar
+
+    var body: some View {
+        @Bindable var p = preferences
+        Form {
+            Section {
+                Toggle("Upcoming events", isOn: $p.calendar)
+                    .onChange(of: p.calendar) { _, on in if on, !calendar.hasAccess { calendar.requestAccess() } }
+                if p.calendar, !calendar.hasAccess {
+                    LabeledContent("Calendar access") {
+                        Button("Allow Access") { calendar.requestAccess() }
+                    }
+                }
+            } footer: {
+                Note("Events show beside the notch 15 minutes before they start, with a reminder at 5. Calls on Zoom, Google Meet, Teams, Webex, FaceTime, Slack and Whereby get a Join button.")
+            }
+            Section {
+                Toggle("Camera and microphone in use", isOn: $p.privacyIndicators)
+            } footer: {
+                Note("A dot beside the notch while any app uses them; a red mic when an app is listening and you're muted. Mute and Check camera are in the call card.")
+            }
+        }
+    }
+}
+
+// MARK: Music
+
+private struct MusicPane: View {
+    @Environment(Preferences.self) private var preferences
+
+    var body: some View {
+        @Bindable var p = preferences
+        Form {
+            Section {
+                Toggle("Now Playing", isOn: $p.nowPlaying)
+                Toggle("Include browsers and all other apps", isOn: $p.allPlayers)
+                    .disabled(!p.nowPlaying)
+            } footer: {
+                Note("Without “all other apps”, Isle follows Music and Spotify only. Music leaves the notch two seconds after you pause; open the island to resume.")
+            }
+        }
+    }
+}
+
+// MARK: Island
+
+private struct IslandPane: View {
+    @Environment(Preferences.self) private var preferences
+
+    var body: some View {
+        @Bindable var p = preferences
+        Form {
+            Section {
+                Picker("Material", selection: $p.style) {
+                    ForEach(IslandStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            } footer: {
+                Note("Black is continuous with the notch. Liquid Glass shows the desktop through the open island.")
+            }
+            Section {
+                Toggle("Open on hover", isOn: $p.expandOnHover)
                 if p.expandOnHover {
                     LabeledContent("Hover delay") {
                         HStack(spacing: 10) {
-                            Slider(value: $p.hoverDelay, in: 0.05...0.6)
-                                .frame(width: 150)
+                            Slider(value: $p.hoverDelay, in: 0.05...0.6).frame(width: 160)
                             Text("\(Int(p.hoverDelay * 1000)) ms")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                                .monospacedDigit().foregroundStyle(.secondary)
                                 .frame(width: 52, alignment: .trailing)
                         }
                     }
@@ -45,106 +274,53 @@ struct SettingsView: View {
                 Toggle("Swipe gestures", isOn: $p.swipeGestures)
                     .help("On the island: swipe up to close, down to open, left or right to skip tracks.")
                 Toggle("Haptic feedback", isOn: $p.haptics)
-                Toggle("Show in menu bar", isOn: $p.showMenuBarIcon)
-            }
-
-            Section {
-                Picker("Material", selection: $p.style) {
-                    ForEach(IslandStyle.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Appearance")
             } footer: {
-                Text("Black blends with the notch. Liquid Glass shows the desktop through the island.")
+                Note("Hover opens the island once the pointer settles, so passing through on the way to the menu bar doesn't.")
             }
-
-            Section("Display") {
+            Section {
                 Picker("Show on", selection: $p.display) {
                     Text("Built-in display").tag(Preferences.DisplayChoice.builtIn)
                     Text("Main display").tag(Preferences.DisplayChoice.main)
                 }
                 Toggle("Use on displays without a notch", isOn: $p.showOnDisplaysWithoutNotch)
-                Toggle("Hide live activities in full screen", isOn: $p.hideInFullScreen)
-                    .help("While a video or app is full screen, the island stays dark. Alerts still appear.")
+                Toggle("Step aside in full screen", isOn: $p.hideInFullScreen)
+                    .help("While a video or app is full screen, live activities stay hidden. Alerts still appear.")
             }
+        }
+    }
+}
 
+// MARK: Alerts
+
+private struct AlertsPane: View {
+    @Environment(Preferences.self) private var preferences
+    @Environment(IslandEngine.self) private var engine
+    @Environment(PowerMonitor.self) private var power
+
+    var body: some View {
+        @Bindable var p = preferences
+        Form {
             Section {
-                Toggle("Show agents in the notch", isOn: $p.agents)
-                LabeledContent("Claude Code") {
-                    if claudeConnected {
-                        HStack(spacing: 10) {
-                            Label("Connected", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Button("Disconnect") { change(ClaudeConnector.disconnect) }
-                        }
-                    } else {
-                        Button("Connect") { change(ClaudeConnector.connect) }
-                    }
-                }
-                Toggle("Open the island when an agent asks for permission", isOn: $p.openForRequests)
-                    .disabled(!p.agents)
-                if let claudeError {
-                    Text(claudeError).foregroundStyle(.red).font(.callout)
-                }
-            } header: {
-                Text("Agents")
-            } footer: {
-                Text("Connecting adds Isle's hooks to ~/.claude/settings.json and keeps a backup next to it. Allow or deny Claude's requests from the notch; if you don't answer within 45 seconds, Claude asks you as usual. Scripts can report too: isle run -- make")
-            }
-
-            Section {
-                Toggle("Now Playing", isOn: $p.nowPlaying)
-                Toggle("Include browsers and all other apps", isOn: $p.allPlayers)
-                    .disabled(!p.nowPlaying)
-                Toggle("Upcoming events", isOn: $p.calendar)
-                    .onChange(of: p.calendar) { _, on in if on, !calendar.hasAccess { calendar.requestAccess() } }
-                Toggle("Camera and microphone in use", isOn: $p.privacyIndicators)
-            } header: {
-                Text("Live Activities")
-            } footer: {
-                Text("Without “all other apps”, Now Playing follows Music and Spotify only.")
-            }
-
-            Section("Alerts") {
                 Toggle("Caps Lock", isOn: $p.capsLockAlerts)
                 Toggle("Charging and Low Power Mode", isOn: $p.powerAlerts)
                 Toggle("Low battery", isOn: $p.lowBatteryAlerts)
                 Toggle("Bluetooth devices", isOn: $p.deviceAlerts)
-                LabeledContent("Preview") {
+            } footer: {
+                Note("Volume and brightness are left to macOS, so nothing shows twice.")
+            }
+            Section {
+                LabeledContent("See each alert") {
                     Button("Play a Tour", action: tour)
                 }
             }
-
-            Section("Updates") {
-                LabeledContent("Isle \(Updater.currentVersion)") {
-                    Button("Check Now", action: updater.checkForUpdates)
-                        .disabled(!updater.canCheck)
-                }
-                Toggle("Check for updates automatically", isOn: $u.automaticallyChecks)
-                Toggle("Download and install automatically", isOn: $u.automaticallyDownloads)
-                    .disabled(!u.automaticallyChecks)
-            }
         }
-        .formStyle(.grouped)
-        .frame(width: 470)
-        .frame(minHeight: 560, idealHeight: 680)
     }
 
-    private func change(_ action: () throws -> Void) {
-        do {
-            try action()
-            claudeError = nil
-        } catch {
-            claudeError = error.localizedDescription
-        }
-        claudeConnected = ClaudeConnector.isConnected
-    }
-
-    /// Shows each alert style in turn.
     private func tour() {
         let level = power.hasBattery ? power.level : 82
         let alerts: [IslandAlert] = [
+            .finished(FinishedInfo(title: "isle is ready", detail: "Claude worked for 12 min", symbol: "checkmark",
+                                   succeeded: true)),
             .power(level: level, isCharging: true),
             .device(DeviceInfo(name: "AirPods Pro", symbol: "airpodspro", battery: 86, isConnected: true)),
             .capsLock(isOn: true),
@@ -161,21 +337,56 @@ struct SettingsView: View {
     }
 }
 
-private struct Header: View {
+// MARK: General
+
+private struct GeneralPane: View {
+    @Environment(Preferences.self) private var preferences
+    @Environment(Updater.self) private var updater
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+
     var body: some View {
-        HStack(spacing: 14) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Isle").font(.title2.weight(.semibold))
-                Text("The Dynamic Island, for your Mac.").foregroundStyle(.secondary)
+        @Bindable var p = preferences
+        @Bindable var u = updater
+        Form {
+            Section {
+                Toggle("Open at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, enabled in
+                        do {
+                            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                        } catch {
+                            launchAtLogin = SMAppService.mainApp.status == .enabled
+                        }
+                    }
+                Toggle("Show in menu bar", isOn: $p.showMenuBarIcon)
             }
-            Spacer()
-            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            Section {
+                LabeledContent("Isle \(Updater.currentVersion)") {
+                    Button("Check Now", action: updater.checkForUpdates)
+                        .disabled(!updater.canCheck)
+                }
+                Toggle("Check for updates automatically", isOn: $u.automaticallyChecks)
+                Toggle("Download and install automatically", isOn: $u.automaticallyDownloads)
+                    .disabled(!u.automaticallyChecks)
+            } header: {
+                Text("Updates")
+            }
+            Section {
+                Link("Isle on GitHub", destination: URL(string: "https://github.com/abhijitrajbanshi/isle")!)
+            } footer: {
+                Note("Open source. Isle does nothing until something happens: no polling, nothing ticking at rest.")
+            }
         }
-        .padding(.vertical, 2)
+    }
+}
+
+/// Section footer text, aligned to the leading edge like System Settings.
+private struct Note: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
