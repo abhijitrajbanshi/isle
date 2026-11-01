@@ -30,7 +30,8 @@ enum ClaudeConnector {
 
     /// Events Isle listens to. Only PermissionRequest waits for an answer;
     /// the rest are fire-and-forget.
-    static let events = ["UserPromptSubmit", "PreToolUse", "PermissionRequest", "Notification", "Stop", "SessionEnd"]
+    static let events = ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
+                         "Notification", "Stop", "SessionEnd"]
     private static let marker = "Contents/Helpers/isle\" hook claude"
 
     static var isConnected: Bool {
@@ -60,7 +61,27 @@ enum ClaudeConnector {
             hooks[event] = groups
         }
         settings["hooks"] = hooks
+        // the status line carries usage limits and context; only if you don't have your own
+        if settings["statusLine"] == nil || isOurStatusLine(settings["statusLine"]) {
+            settings["statusLine"] = ["type": "command", "command": "\"\(helper)\" statusline", "padding": 0]
+        }
         try write(settings)
+    }
+
+    /// Re-installs after an update added events, keeping your settings.
+    static func upgradeIfNeeded() {
+        guard let settings = try? read(), let hooks = settings["hooks"] as? [String: Any],
+              (hooks["PermissionRequest"] as? [[String: Any]] ?? []).contains(where: isOurs),
+              !isConnected || settings["statusLine"] == nil else { return }
+        try? connect()
+    }
+
+    static var hasStatusLine: Bool {
+        (try? read()).map { isOurStatusLine($0["statusLine"]) } ?? false
+    }
+
+    private static func isOurStatusLine(_ value: Any?) -> Bool {
+        ((value as? [String: Any])?["command"] as? String)?.contains("Contents/Helpers/isle\" statusline") == true
     }
 
     static func disconnect() throws {
@@ -73,6 +94,7 @@ enum ClaudeConnector {
             hooks[event] = kept.isEmpty ? nil : kept
         }
         settings["hooks"] = hooks.isEmpty ? nil : hooks
+        if isOurStatusLine(settings["statusLine"]) { settings["statusLine"] = nil }
         try write(settings)
     }
 

@@ -108,6 +108,7 @@ extension ActivityHub {
     func handle(_ line: Data) async -> Data {
         guard let message = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
               let kind = message["kind"] as? String else { return Self.reply(["ok": false]) }
+        Self.capture(message, line: line)
         switch kind {
         case "claude":
             let event = message["event"] as? String ?? ""
@@ -129,7 +130,10 @@ extension ActivityHub {
                 return first
             }
             // no decision: Claude shows its normal prompt
-            return Self.reply(decision.map { ["decision": $0.rawValue] } ?? ["decision": NSNull()])
+            return Self.reply(Self.answer(decision, to: request))
+        case "status":
+            status(message["payload"] as? [String: Any] ?? [:])
+            return Self.reply(["ok": true])
         case "task":
             let id = message["id"] as? String ?? UUID().uuidString
             let title = message["title"] as? String ?? "Task"
@@ -143,6 +147,41 @@ extension ActivityHub {
             return Self.reply(["ok": true])
         default:
             return Self.reply(["ok": false])
+        }
+    }
+
+    /// Developer aid (`defaults write com.avhiejeet.Isle debugHooks -bool true`):
+    /// keeps the last message of each kind in Application Support/Isle/hooks.
+    private static func capture(_ message: [String: Any], line: Data) {
+        guard UserDefaults.standard.bool(forKey: "debugHooks") else { return }
+        let name = (message["event"] as? String) ?? (message["kind"] as? String) ?? "unknown"
+        let tool = ((message["payload"] as? [String: Any])?["tool_name"] as? String).map { "-\($0)" } ?? ""
+        let folder = (ActivityServer.socketPath as NSString).deletingLastPathComponent + "/hooks"
+        try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        try? line.write(to: URL(fileURLWithPath: "\(folder)/\(name)\(tool).json"))
+    }
+
+    /// The decision as the `isle` command passes it to Claude Code: a
+    /// behaviour, plus updated input (answers) or permissions (always allow).
+    static func answer(_ decision: Decision?, to request: PermissionRequest) -> [String: Any] {
+        func json(_ data: Data?) -> Any? { data.flatMap { try? JSONSerialization.jsonObject(with: $0) } }
+        switch decision {
+        case nil:
+            return ["decision": NSNull()]
+        case .allow:
+            return ["decision": "allow"]
+        case .deny:
+            return ["decision": "deny", "message": "Denied from the Isle notch."]
+        case .keepPlanning:
+            return ["decision": "deny", "message": "The user wants to keep planning before you start."]
+        case .allowAlways:
+            var reply: [String: Any] = ["decision": "allow"]
+            if let rules = json(request.suggestionsJSON) { reply["updatedPermissions"] = rules }
+            return reply
+        case .answers(let answers):
+            var input = json(request.inputJSON) as? [String: Any] ?? [:]
+            input["answers"] = answers
+            return ["decision": "allow", "updatedInput": input]
         }
     }
 

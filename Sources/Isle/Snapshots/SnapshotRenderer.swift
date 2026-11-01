@@ -110,6 +110,57 @@ enum SnapshotRenderer {
             c.engine.expand(tab: .timer)
         },
         Scene(name: "21-open-shelf") { $0.engine.expand(tab: .shelf) },
+        Scene(name: "24-open-question") { c in
+            c.hub.preview([agent(state: .needsYou, request: ActivityHub.request(tool: "AskUserQuestion", input: [
+                "questions": [["question": "Which payment provider should I use?", "header": "Payments", "multiSelect": false,
+                               "options": [["label": "Stripe (already in the project)"], ["label": "Adyen"],
+                                           ["label": "Apple Pay only"]]]]], suggestions: nil))])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "25-open-plan") { c in
+            c.hub.preview([agent(state: .needsYou, request: ActivityHub.request(tool: "ExitPlanMode", input: [
+                "plan": "# Apple Pay in checkout\n1. Add the PassKit entitlement\n2. Build the payment sheet\n3. Handle the webhook\n4. Tests for declined cards"],
+                suggestions: nil))])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "26-open-always-allow") { c in
+            c.hub.preview([agent(state: .needsYou, request: ActivityHub.request(
+                tool: "Bash", input: ["command": "swift test --parallel"],
+                suggestions: [["type": "addRules", "rules": [["toolName": "Bash", "ruleContent": "swift test:*"]],
+                               "behavior": "allow", "destination": "localSettings"]]))])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "27-open-review") { c in
+            var done = agent(state: .review)
+            done.lastTest = .init(command: "swift test", passed: true)
+            done.review = .init(summary: "Added Apple Pay to checkout", minutes: 23,
+                                files: [.init(path: "Sources/Checkout/ApplePay.swift", added: 148, removed: 0),
+                                        .init(path: "Sources/Checkout/CheckoutView.swift", added: 41, removed: 22),
+                                        .init(path: "Tests/CheckoutTests.swift", added: 25, removed: 15)],
+                                added: 214, removed: 37, pullRequest: URL(string: "https://github.com/o/r/pull/482"),
+                                loaded: true)
+            done.host = 1
+            c.hub.preview([done])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "28-open-usage") { c in
+            var a = agent(state: .working)
+            a.meter = .init(contextPercent: 64, costUSD: 4.2)
+            var b = agent(state: .working)
+            b = ActivityHub.Activity(id: "api", kind: .agent, title: "api", detail: "Running migrations", state: .working,
+                                     progress: nil, started: .now, request: nil, meter: .init(contextPercent: 88, costUSD: 1.9))
+            _ = (a, b)
+            c.hub.preview([], usage: sampleUsage(84))
+            c.engine.expand(tab: .home)
+            c.engine.tab = .home
+        },
+        Scene(name: "29-compact-usage") { c in
+            c.hub.preview([], usage: sampleUsage(84))
+            c.engine.activities = { [.usage] }
+        },
+        Scene(name: "30-banner-limit") {
+            $0.engine.present(.limit(LimitInfo(percent: 82, window: "5-hour", resetsAt: .now.addingTimeInterval(5400))))
+        },
         Scene(name: "22-open-shelf-dropping") { $0.engine.fileDragEnteredDropZone() },
         Scene(name: "23-open-summary") { c in
             c.shelf.previewSummary(ShelfModel.Summary(file: "Q3 planning.pdf", text: """
@@ -120,6 +171,18 @@ enum SnapshotRenderer {
             c.engine.expand(tab: .shelf)
         },
     ]
+
+    static func sampleUsage(_ used: Double) -> ActivityHub.Usage {
+        ActivityHub.Usage(fiveHour: .init(used: used, resetsAt: .now.addingTimeInterval(5400)),
+                          weekly: .init(used: 41, resetsAt: .now.addingTimeInterval(3 * 86_400)),
+                          updated: .now, capForecast: .now.addingTimeInterval(1800))
+    }
+
+    static func agent(state: ActivityHub.Activity.State, request: ActivityHub.PermissionRequest) -> ActivityHub.Activity {
+        var a = agent(state: state)
+        a.request = request
+        return a
+    }
 
     static func agent(state: ActivityHub.Activity.State) -> ActivityHub.Activity {
         ActivityHub.Activity(

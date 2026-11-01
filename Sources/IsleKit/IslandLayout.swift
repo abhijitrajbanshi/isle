@@ -65,6 +65,7 @@ public struct IslandLayout: Equatable, Sendable {
         case .privacy: notchHeight + 2
         case .task: 64
         case .agent: 84
+        case .usage: 92
         }
     }
 

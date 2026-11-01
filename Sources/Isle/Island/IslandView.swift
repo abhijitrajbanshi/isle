@@ -129,7 +129,7 @@ struct IslandView: View {
             case .nowPlaying: return music ?? .signature
             case .timer: return Ambience(accent: Palette.orange)
             case .calendar: return calendar.current().map { Ambience($0.color) } ?? .signature
-            case .agent: return Ambience(accent: Palette.amber)
+            case .agent, .usage: return Ambience(accent: Palette.amber)
             case .task, .privacy: return .signature
             }
         case .alert(.eventSoon(let event)):

@@ -155,6 +155,18 @@ private struct AlertBanner: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { calendar.openCalendar() }
+        case .limit(let info):
+            HStack(spacing: 13) {
+                Image(systemName: "gauge.with.dots.needle.67percent")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Palette.amber)
+                    .frame(width: 32)
+                Titles(title: "Claude usage at \(info.percent)%",
+                       subtitle: "\(info.window.prefix(1).uppercased() + info.window.dropFirst()) limit · resets " + (info.window == "weekly"
+                           ? info.resetsAt.formatted(.dateTime.weekday(.wide).hour().minute())
+                           : info.resetsAt.formatted(date: .omitted, time: .shortened)))
+                Spacer(minLength: 8)
+            }
         case .finished(let info):
             HStack(spacing: 13) {
                 Image(systemName: info.succeeded ? "checkmark" : "xmark")

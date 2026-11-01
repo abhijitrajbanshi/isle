@@ -42,6 +42,7 @@ final class IsleContainer {
             var live: [LiveActivity] = []
             if hub.hasAgent { live.append(.agent) }
             if hub.hasTask { live.append(.task) }
+            if hub.isNearLimit { live.append(.usage) }
             if timer.isActive { live.append(.timer) }
             if nowPlaying.isActive { live.append(.nowPlaying) }
             if calendar.current() != nil { live.append(.calendar) }
@@ -70,6 +71,7 @@ final class IsleContainer {
         timer.onFinish = { [unowned self] in engine.present(.timerDone) }
         hub.isEnabled = { p.agents }
         hub.onFinish = { [unowned self] in engine.present(.finished($0)) }
+        hub.onLimit = { [unowned self] in engine.present(.limit($0)) }
         // the open shelf already shows the result; the banner is for when you've moved on
         shelf.onFinish = { [unowned self] in if !engine.isExpanded { engine.present(.finished($0)) } }
         hub.onRequest = { [unowned self] in
@@ -119,6 +121,7 @@ final class IsleContainer {
         audio.start()
         hub.start()
         server.start()
+        ClaudeConnector.upgradeIfNeeded()
         bluetooth.start()
         calendar.start()
     }

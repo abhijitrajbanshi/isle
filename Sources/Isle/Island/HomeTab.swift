@@ -6,7 +6,8 @@ import SwiftUI
 /// size: it's as tall as what's in it. Clicking a row brings it up.
 struct StackView: View {
     enum Hero: Hashable {
-        case request(String), call(String), music, agent(String), timer, task(String), summary, quiet
+        case request(String), review(String), call(String), music, agent(String), timer, task(String), usage,
+             summary, quiet
     }
     enum Panel { case output, awake }
 
@@ -25,12 +26,14 @@ struct StackView: View {
         var list: [Hero] = []
         let agents = hub.live.filter { $0.kind == .agent }
         list += agents.filter { $0.request != nil }.map { .request($0.id) }
+        list += agents.filter { $0.request == nil && $0.state == .review }.map { .review($0.id) }
         if let meeting = calendar.nextMeeting() { list.append(.call(meeting.id)) }
         if player.track != nil { list.append(.music) }
-        list += agents.filter { $0.request == nil }.map { .agent($0.id) }
+        list += agents.filter { $0.request == nil && $0.state != .review }.map { .agent($0.id) }
         if timer.isActive { list.append(.timer) }
         list += hub.live.filter { $0.kind == .task }.map { .task($0.id) }
         if shelf.summary != nil { list.append(.summary) }
+        if hub.usage != nil, hub.isEnabled() { list.append(.usage) }
         return list
     }
 
@@ -101,10 +104,19 @@ struct StackView: View {
         .padding(.top, 2)
     }
 
+    private func requestStatus(_ id: String) -> String {
+        switch hub.live.first(where: { $0.id == id })?.request?.kind {
+        case .question: "Question"
+        case .plan: "Plan ready"
+        default: "Needs permission"
+        }
+    }
+
     private func title(for hero: Hero) -> String {
         switch hero {
-        case .request(let id), .agent(let id):
+        case .request(let id), .agent(let id), .review(let id):
             "Claude Code · \(hub.live.first { $0.id == id }?.title ?? "")"
+        case .usage: "Claude usage"
         case .call: "Up next"
         case .music: "Now playing"
         case .timer: "Timer"
@@ -117,8 +129,12 @@ struct StackView: View {
     @ViewBuilder
     private func status(for hero: Hero) -> some View {
         switch hero {
-        case .request:
-            Text("Needs permission").foregroundStyle(Palette.amber)
+        case .request(let id):
+            Text(requestStatus(id)).foregroundStyle(Palette.amber)
+        case .review:
+            Text("Ready for review").foregroundStyle(Palette.green)
+        case .usage:
+            if let model = hub.live.compactMap(\.meter?.model).first { Text(model).foregroundStyle(Palette.secondaryLabel) }
         case .call(let id):
             if let event = calendar.upcoming.first(where: { $0.id == id }) {
                 TimelineView(.periodic(from: .now, by: 15)) { context in
@@ -152,6 +168,12 @@ struct StackView: View {
             NowPlayingCard()
         case .agent(let id):
             if let activity = hub.live.first(where: { $0.id == id }) { AgentCard(activity: activity) }
+        case .review(let id):
+            if let activity = hub.live.first(where: { $0.id == id }), let review = activity.review {
+                ReviewCard(activity: activity, review: review)
+            }
+        case .usage:
+            if let usage = hub.usage { UsageCard(usage: usage) }
         case .timer:
             TimerTab()
         case .task(let id):
@@ -202,8 +224,11 @@ private struct StackRow: View {
         switch hero {
         case .music:
             ArtworkView(image: player.artwork, size: 24, cornerRadius: 7)
-        case .request, .agent:
+        case .request, .agent, .review:
             Image(systemName: "terminal.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
+        case .usage:
+            Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(hub.isNearLimit ? Palette.amber : Palette.secondaryLabel)
         case .call:
             Image(systemName: "video.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.green)
         case .timer:
@@ -223,10 +248,12 @@ private struct StackRow: View {
             if let track = player.track {
                 Text(track.title) + Text(track.artist.isEmpty ? "" : "  \(track.artist)").foregroundStyle(Palette.tertiaryLabel)
             }
-        case .request(let id), .agent(let id), .task(let id):
+        case .request(let id), .agent(let id), .task(let id), .review(let id):
             if let activity = hub.live.first(where: { $0.id == id }) {
                 Text(activity.title) + Text("  \(activity.detail)").foregroundStyle(Palette.tertiaryLabel)
             }
+        case .usage:
+            Text("Claude usage") + Text("  5-hour window").foregroundStyle(Palette.tertiaryLabel)
         case .call(let id):
             Text(calendar.upcoming.first { $0.id == id }?.title ?? "Meeting")
         case .timer:
@@ -243,8 +270,14 @@ private struct StackRow: View {
         case .music:
             IslandButton(symbol: player.isPlaying ? "pause.fill" : "play.fill",
                          label: player.isPlaying ? "Pause" : "Play", size: 12, diameter: 26) { player.togglePlayPause() }
-        case .request(let id), .agent(let id), .task(let id):
+        case .request(let id), .agent(let id), .task(let id), .review(let id):
             if let activity = hub.live.first(where: { $0.id == id }) { ActivityStatus(activity: activity, size: 12) }
+        case .usage:
+            if let window = hub.usage?.fiveHour ?? hub.usage?.weekly {
+                Text("\(Int(window.used))% · resets \(window.resetsAt.formatted(date: .omitted, time: .shortened))")
+                    .font(.islandNumber(12, .medium))
+                    .foregroundStyle(window.used >= 80 ? Palette.amber : Palette.secondaryLabel)
+            }
         case .call(let id):
             if let event = calendar.upcoming.first(where: { $0.id == id }), let meeting = event.meeting {
                 ActionPill(symbol: "video.fill", title: "Join", color: .white, height: 24) { calendar.join(meeting) }

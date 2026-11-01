@@ -14,6 +14,7 @@ struct ActivityHubTests {
 
     @Test func agentLifecycle() {
         let hub = ActivityHub()
+        hub.inspectChanges = { _ in ChangeSummary() }
         var finished: [FinishedInfo] = []
         hub.onFinish = { finished.append($0) }
 
@@ -29,8 +30,10 @@ struct ActivityHubTests {
         #expect(hub.live.first?.state == .yourTurn)
 
         hub.claude(event: "Stop", payload: event("Stop"))
-        #expect(hub.live.isEmpty)
+        #expect(hub.live.first?.state == .review)
         #expect(finished.first?.title == "isle is ready")
+        hub.dismissReview("s1")
+        #expect(hub.live.isEmpty)
     }
 
     @Test func permissionRequestWaitsForTheIsland() async {
@@ -94,6 +97,7 @@ struct ActivityHubTests {
 
     private func hostedHub() -> ActivityHub {
         let hub = ActivityHub()
+        hub.inspectChanges = { _ in ChangeSummary() }
         hub.resolveHost = { $0.first }   // the first ancestor is "the app"
         return hub
     }
@@ -141,5 +145,90 @@ struct ActivityHubTests {
         hub.activated(42)
         hub.claude(event: "Stop", payload: event("Stop"))
         #expect(finished == 0)
+    }
+
+    // MARK: Questions, plans, always allow
+
+    @Test func questionsAreAnsweredWithTheChosenOption() throws {
+        let input: [String: Any] = ["questions": [[
+            "question": "Which provider?", "header": "Payments", "multiSelect": false,
+            "options": [["label": "Stripe", "description": "in the project"], ["label": "Adyen", "description": ""]],
+        ]]]
+        let request = ActivityHub.request(tool: "AskUserQuestion", input: input, suggestions: nil)
+        guard case .question(let questions) = request.kind else { Issue.record("not a question"); return }
+        #expect(questions.first?.options == ["Stripe", "Adyen"])
+
+        let reply = ActivityHub.answer(.answers(["Which provider?": "Stripe"]), to: request)
+        #expect(reply["decision"] as? String == "allow")
+        let updated = try #require(reply["updatedInput"] as? [String: Any])
+        #expect((updated["answers"] as? [String: String])?["Which provider?"] == "Stripe")
+        #expect((updated["questions"] as? [[String: Any]])?.count == 1)   // the original input is kept
+    }
+
+    @Test func planApprovalAndKeepPlanning() {
+        let request = ActivityHub.request(tool: "ExitPlanMode", input: ["plan": "# Plan\n- Add tests"], suggestions: nil)
+        #expect(request.kind == .plan("# Plan\n- Add tests"))
+        #expect(ActivityHub.answer(.allow, to: request)["decision"] as? String == "allow")
+        let keep = ActivityHub.answer(.keepPlanning, to: request)
+        #expect(keep["decision"] as? String == "deny")
+        #expect((keep["message"] as? String)?.contains("keep planning") == true)
+    }
+
+    @Test func alwaysAllowUsesClaudesOwnSuggestion() {
+        let suggestion: [[String: Any]] = [["type": "addRules", "behavior": "allow", "destination": "localSettings",
+                                            "rules": [["toolName": "Bash", "ruleContent": "swift test:*"]]]]
+        let request = ActivityHub.request(tool: "Bash", input: ["command": "swift test"], suggestions: suggestion)
+        #expect(request.alwaysTitle == "Always allow swift test")
+        let reply = ActivityHub.answer(.allowAlways, to: request)
+        #expect((reply["updatedPermissions"] as? [[String: Any]])?.first?["destination"] as? String == "localSettings")
+        // no suggestion, no button
+        #expect(ActivityHub.request(tool: "Bash", input: ["command": "ls"], suggestions: nil).alwaysTitle == nil)
+    }
+
+    // MARK: Usage
+
+    private func statusPayload(used: Double, resets: Date, weekly: Double = 20) -> [String: Any] {
+        ["session_id": "s1",
+         "rate_limits": ["five_hour": ["used_percentage": used, "resets_at": resets.timeIntervalSince1970],
+                         "seven_day": ["used_percentage": weekly, "resets_at": resets.addingTimeInterval(86_400).timeIntervalSince1970]],
+         "context_window": ["used_percentage": 42], "cost": ["total_cost_usd": 1.25, "total_lines_added": 10]]
+    }
+
+    @Test func usageForecastsTheCapAndAlertsOnce() {
+        let hub = ActivityHub()
+        var limits: [LimitInfo] = []
+        hub.onLimit = { limits.append($0) }
+        hub.claude(event: "UserPromptSubmit", payload: event("UserPromptSubmit"))
+        let start = Date.now
+        let resets = start.addingTimeInterval(3 * 3600)
+        hub.status(statusPayload(used: 60, resets: resets), now: start)
+        hub.status(statusPayload(used: 70, resets: resets), now: start.addingTimeInterval(600))
+        // 10 points per 10 minutes: from 70% at minute 10, 100% at minute 40, well before the reset
+        let forecast = hub.usage?.capForecast
+        #expect(forecast != nil && abs(forecast!.timeIntervalSince(start.addingTimeInterval(2400))) < 5)
+        #expect(hub.live.first?.meter?.contextPercent == 42)
+        #expect(!hub.isNearLimit)
+
+        hub.status(statusPayload(used: 82, resets: resets), now: start.addingTimeInterval(900))
+        hub.status(statusPayload(used: 84, resets: resets), now: start.addingTimeInterval(960))
+        #expect(hub.isNearLimit)
+        #expect(limits.map(\.percent) == [82])   // once per threshold and window
+    }
+
+    @Test func reviewGathersChanges() async {
+        let hub = ActivityHub()
+        hub.inspectChanges = { _ in
+            ChangeSummary(files: [.init(path: "Sources/A.swift", added: 12, removed: 3)],
+                          pullRequest: URL(string: "https://github.com/o/r/pull/7"))
+        }
+        hub.claude(event: "UserPromptSubmit", payload: event("UserPromptSubmit"))
+        hub.claude(event: "PostToolUse", payload: event("PostToolUse", tool: "Bash", input: ["command": "swift test"]))
+        hub.claude(event: "Stop", payload: event("Stop", extra: ["last_assistant_message": "Added tests.\nMore detail"]))
+        #expect(await eventually { hub.live.first?.review?.loaded == true })
+        let review = hub.live.first?.review
+        #expect(review?.summary == "Added tests.")
+        #expect(review?.added == 12 && review?.files.count == 1)
+        #expect(review?.pullRequest?.lastPathComponent == "7")
+        #expect(hub.live.first?.lastTest?.passed == true)
     }
 }

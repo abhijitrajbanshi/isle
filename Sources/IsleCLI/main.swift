@@ -4,6 +4,7 @@ import Foundation
 // `isle`: reports to the Isle island over its local socket.
 //
 //   isle hook claude                      Claude Code hook (reads the event on stdin)
+//   isle statusline                       Claude Code status line (usage, context, cost)
 //   isle run [--title T] -- command…      run a command as a live activity
 //   isle progress ID FRACTION [--title T] [--detail D]
 //   isle done ID [--failed] [--detail D]
@@ -95,12 +96,32 @@ case "hook":
     if event == "PermissionRequest", let behavior = reply?["decision"] as? String,
        behavior == "allow" || behavior == "deny" {
         var decision: [String: Any] = ["behavior": behavior]
-        if behavior == "deny" { decision["message"] = "Denied from the Isle notch." }
+        if behavior == "deny" { decision["message"] = reply?["message"] as? String ?? "Denied from the Isle notch." }
+        if let input = reply?["updatedInput"] { decision["updatedInput"] = input }
+        if let rules = reply?["updatedPermissions"] { decision["updatedPermissions"] = rules }
         let output: [String: Any] = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": decision]]
         if let data = try? JSONSerialization.data(withJSONObject: output) {
             FileHandle.standardOutput.write(data)
         }
     }
+    exit(0)
+
+case "statusline":
+    // Claude Code's status line: forward the session's numbers to Isle, and
+    // print a short line for Claude Code to show.
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    guard let payload = (try? JSONSerialization.jsonObject(with: input)) as? [String: Any] else { exit(0) }
+    _ = send(["kind": "status", "payload": payload])
+    var parts: [String] = []
+    if let model = (payload["model"] as? [String: Any])?["display_name"] as? String { parts.append(model) }
+    if let context = (payload["context_window"] as? [String: Any])?["used_percentage"] as? Double {
+        parts.append("context \(Int(context))%")
+    }
+    if let five = ((payload["rate_limits"] as? [String: Any])?["five_hour"] as? [String: Any])?["used_percentage"]
+        as? Double {
+        parts.append("5h \(Int(five))%")
+    }
+    print(parts.joined(separator: " · "))
     exit(0)
 
 case "run":

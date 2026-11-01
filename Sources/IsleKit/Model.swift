@@ -25,6 +25,8 @@ public struct NotchMetrics: Equatable, Sendable {
 /// the runner-up gets the detached bubble.
 public enum LiveActivity: Int, Comparable, Hashable, Sendable, CaseIterable {
     case privacy
+    /// Claude usage near a limit.
+    case usage
     case calendar
     /// Anything posted through the activity API: builds, downloads, scripts.
     case task
@@ -78,6 +80,17 @@ public struct FinishedInfo: Equatable, Sendable {
     }
 }
 
+/// A Claude usage window filling up.
+public struct LimitInfo: Equatable, Sendable {
+    public var percent: Int
+    /// "5-hour" or "weekly".
+    public var window: String
+    public var resetsAt: Date
+    public init(percent: Int, window: String, resetsAt: Date) {
+        self.percent = percent; self.window = window; self.resetsAt = resetsAt
+    }
+}
+
 /// Short-lived system alerts.
 public enum IslandAlert: Equatable, Sendable {
     case capsLock(isOn: Bool)
@@ -89,9 +102,11 @@ public enum IslandAlert: Equatable, Sendable {
     case eventSoon(EventInfo)
     /// An agent or task finished (or failed).
     case finished(FinishedInfo)
+    /// Claude usage crossed 80% or 95% of a window.
+    case limit(LimitInfo)
 
     public enum Kind: Hashable, Sendable {
-        case capsLock, power, lowBattery, device, timer, event, finished
+        case capsLock, power, lowBattery, device, timer, event, finished, limit
     }
 
     public enum Style: Sendable {
@@ -112,6 +127,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .timerDone: .timer
         case .eventSoon: .event
         case .finished: .finished
+        case .limit: .limit
         }
     }
 
@@ -119,7 +135,7 @@ public enum IslandAlert: Equatable, Sendable {
         switch self {
         case .capsLock: .hud
         case .power, .lowPowerMode: .wide
-        case .lowBattery, .device, .timerDone, .eventSoon, .finished: .banner
+        case .lowBattery, .device, .timerDone, .eventSoon, .finished, .limit: .banner
         }
     }
 
@@ -130,7 +146,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .power, .lowPowerMode: .milliseconds(2600)
         case .timerDone: .seconds(12)
         case .lowBattery, .device, .eventSoon: .seconds(4)
-        case .finished: .seconds(5)
+        case .finished, .limit: .seconds(5)
         }
     }
 }
