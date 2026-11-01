@@ -22,6 +22,8 @@ final class Preferences {
     var calendar: Bool { didSet { save(calendar, "calendar") } }
     var privacyIndicators: Bool { didSet { save(privacyIndicators, "privacyIndicators") } }
     var agents: Bool { didSet { save(agents, "agents") } }
+    var githubCI: Bool { didSet { save(githubCI, "githubCI") } }
+    var githubReviews: Bool { didSet { save(githubReviews, "githubReviews") } }
     /// Open the island by itself when an agent asks for permission.
     var openForRequests: Bool { didSet { save(openForRequests, "openForRequests") } }
 
@@ -48,6 +50,8 @@ final class Preferences {
         style = IslandStyle(rawValue: defaults.string(forKey: "islandStyle") ?? "") ?? .glass
         nowPlaying = bool("nowPlaying")
         agents = bool("agents")
+        githubCI = bool("githubCI")
+        githubReviews = bool("githubReviews")
         openForRequests = bool("openForRequests")
         allPlayers = bool("allPlayers")
         calendar = bool("calendar")

@@ -32,6 +32,7 @@ struct CompactContent: View {
         case .agent: ActivityCompactLeading(kind: .agent)
         case .task: ActivityCompactLeading(kind: .task)
         case .usage: UsageCompactLeading()
+        case .ci: CICompactLeading()
         }
     }
 
@@ -45,6 +46,7 @@ struct CompactContent: View {
         case .agent: ActivityCompactTrailing(kind: .agent)
         case .task: ActivityCompactTrailing(kind: .task)
         case .usage: UsageCompactTrailing()
+        case .ci: CICompactTrailing()
         }
     }
 }
@@ -65,6 +67,7 @@ struct BubbleContent: View {
         case .usage:
             Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Palette.amber)
+        case .ci: CICompactLeading()
         }
     }
 }

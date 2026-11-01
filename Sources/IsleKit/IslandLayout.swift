@@ -66,6 +66,7 @@ public struct IslandLayout: Equatable, Sendable {
         case .task: 64
         case .agent: 84
         case .usage: 92
+        case .ci: 72
         }
     }
 

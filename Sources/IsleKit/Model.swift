@@ -30,6 +30,8 @@ public enum LiveActivity: Int, Comparable, Hashable, Sendable, CaseIterable {
     case calendar
     /// Anything posted through the activity API: builds, downloads, scripts.
     case task
+    /// CI on a commit you pushed.
+    case ci
     case nowPlaying
     case timer
     /// AI coding agents (Claude Code): working, waiting on you, done.
@@ -91,6 +93,18 @@ public struct LimitInfo: Equatable, Sendable {
     }
 }
 
+/// A pull request waiting on you, or news on yours.
+public struct PullRequestInfo: Equatable, Sendable {
+    public enum Event: Equatable, Sendable { case reviewRequested, approved, changesRequested }
+    public var title: String
+    public var repo: String
+    public var number: Int
+    public var event: Event
+    public init(title: String, repo: String, number: Int, event: Event) {
+        self.title = title; self.repo = repo; self.number = number; self.event = event
+    }
+}
+
 /// Short-lived system alerts.
 public enum IslandAlert: Equatable, Sendable {
     case capsLock(isOn: Bool)
@@ -104,9 +118,10 @@ public enum IslandAlert: Equatable, Sendable {
     case finished(FinishedInfo)
     /// Claude usage crossed 80% or 95% of a window.
     case limit(LimitInfo)
+    case pullRequest(PullRequestInfo)
 
     public enum Kind: Hashable, Sendable {
-        case capsLock, power, lowBattery, device, timer, event, finished, limit
+        case capsLock, power, lowBattery, device, timer, event, finished, limit, pullRequest
     }
 
     public enum Style: Sendable {
@@ -128,6 +143,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .eventSoon: .event
         case .finished: .finished
         case .limit: .limit
+        case .pullRequest: .pullRequest
         }
     }
 
@@ -135,7 +151,7 @@ public enum IslandAlert: Equatable, Sendable {
         switch self {
         case .capsLock: .hud
         case .power, .lowPowerMode: .wide
-        case .lowBattery, .device, .timerDone, .eventSoon, .finished, .limit: .banner
+        case .lowBattery, .device, .timerDone, .eventSoon, .finished, .limit, .pullRequest: .banner
         }
     }
 
@@ -146,7 +162,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .power, .lowPowerMode: .milliseconds(2600)
         case .timerDone: .seconds(12)
         case .lowBattery, .device, .eventSoon: .seconds(4)
-        case .finished, .limit: .seconds(5)
+        case .finished, .limit, .pullRequest: .seconds(5)
         }
     }
 }

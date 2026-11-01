@@ -6,8 +6,8 @@ import SwiftUI
 /// size: it's as tall as what's in it. Clicking a row brings it up.
 struct StackView: View {
     enum Hero: Hashable {
-        case request(String), review(String), call(String), music, agent(String), timer, task(String), usage,
-             summary, quiet
+        case request(String), review(String), ci(String), pullRequest(String), call(String), music, agent(String),
+             timer, task(String), usage, summary, quiet
     }
     enum Panel { case output, awake }
 
@@ -18,6 +18,7 @@ struct StackView: View {
     @Environment(TimerModel.self) private var timer
     @Environment(AudioModel.self) private var audio
     @Environment(ShelfModel.self) private var shelf
+    @Environment(GitHubModel.self) private var github
     @State private var pinned: Hero?
     @State private var panel: Panel?
 
@@ -27,11 +28,16 @@ struct StackView: View {
         let agents = hub.live.filter { $0.kind == .agent }
         list += agents.filter { $0.request != nil }.map { .request($0.id) }
         list += agents.filter { $0.request == nil && $0.state == .review }.map { .review($0.id) }
+        list += github.live.filter { $0.state == .failed }.map { .ci($0.id) }
+        list += github.pullRequests.prefix(3).filter { $0.kind == .reviewRequested || $0.kind == .changesRequested }
+            .map { .pullRequest($0.id) }
         if let meeting = calendar.nextMeeting() { list.append(.call(meeting.id)) }
         if player.track != nil { list.append(.music) }
         list += agents.filter { $0.request == nil && $0.state != .review }.map { .agent($0.id) }
         if timer.isActive { list.append(.timer) }
         list += hub.live.filter { $0.kind == .task }.map { .task($0.id) }
+        list += github.live.filter { $0.state != .failed }.map { .ci($0.id) }
+        list += github.pullRequests.prefix(3).filter { $0.kind == .approved }.map { .pullRequest($0.id) }
         if shelf.summary != nil { list.append(.summary) }
         if hub.usage != nil, hub.isEnabled() { list.append(.usage) }
         return list
@@ -117,6 +123,8 @@ struct StackView: View {
         case .request(let id), .agent(let id), .review(let id):
             "Claude Code · \(hub.live.first { $0.id == id }?.title ?? "")"
         case .usage: "Claude usage"
+        case .ci: "GitHub Actions"
+        case .pullRequest: "Pull request"
         case .call: "Up next"
         case .music: "Now playing"
         case .timer: "Timer"
@@ -133,6 +141,11 @@ struct StackView: View {
             Text(requestStatus(id)).foregroundStyle(Palette.amber)
         case .review:
             Text("Ready for review").foregroundStyle(Palette.green)
+        case .ci(let id):
+            if let run = github.live.first(where: { $0.id == id }) {
+                Text(run.state == .failed ? "Failed" : run.state == .passed ? "Passed" : "Running")
+                    .foregroundStyle(run.state == .failed ? Palette.red : run.state == .passed ? Palette.green : Palette.secondaryLabel)
+            }
         case .usage:
             if let model = hub.live.compactMap(\.meter?.model).first { Text(model).foregroundStyle(Palette.secondaryLabel) }
         case .call(let id):
@@ -174,6 +187,10 @@ struct StackView: View {
             }
         case .usage:
             if let usage = hub.usage { UsageCard(usage: usage) }
+        case .ci(let id):
+            if let run = github.live.first(where: { $0.id == id }) { CICard(run: run) }
+        case .pullRequest(let id):
+            if let item = github.pullRequests.first(where: { $0.id == id }) { PullRequestCard(item: item) }
         case .timer:
             TimerTab()
         case .task(let id):
@@ -196,6 +213,7 @@ private struct StackRow: View {
     @Environment(NowPlayingModel.self) private var player
     @Environment(CalendarModel.self) private var calendar
     @Environment(ShelfModel.self) private var shelf
+    @Environment(GitHubModel.self) private var github
     @State private var isHovering = false
 
     var body: some View {
@@ -229,6 +247,17 @@ private struct StackRow: View {
         case .usage:
             Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(hub.isNearLimit ? Palette.amber : Palette.secondaryLabel)
+        case .ci(let id):
+            let run = github.live.first { $0.id == id }
+            if run?.state == .failed {
+                Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.red)
+            } else if run?.state == .passed {
+                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Palette.green)
+            } else {
+                ProgressGlyph(progress: run?.progress ?? 0.02, size: 13)
+            }
+        case .pullRequest:
+            Image(systemName: "arrow.triangle.pull").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
         case .call:
             Image(systemName: "video.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.green)
         case .timer:
@@ -254,6 +283,14 @@ private struct StackRow: View {
             }
         case .usage:
             Text("Claude usage") + Text("  5-hour window").foregroundStyle(Palette.tertiaryLabel)
+        case .ci(let id):
+            if let run = github.live.first(where: { $0.id == id }) {
+                Text("CI · \(run.branch)") + Text("  \(run.repo)").foregroundStyle(Palette.tertiaryLabel)
+            }
+        case .pullRequest(let id):
+            if let item = github.pullRequests.first(where: { $0.id == id }) {
+                Text(item.title) + Text("  #\(item.number)").foregroundStyle(Palette.tertiaryLabel)
+            }
         case .call(let id):
             Text(calendar.upcoming.first { $0.id == id }?.title ?? "Meeting")
         case .timer:
@@ -272,6 +309,20 @@ private struct StackRow: View {
                          label: player.isPlaying ? "Pause" : "Play", size: 12, diameter: 26) { player.togglePlayPause() }
         case .request(let id), .agent(let id), .task(let id), .review(let id):
             if let activity = hub.live.first(where: { $0.id == id }) { ActivityStatus(activity: activity, size: 12) }
+        case .ci(let id):
+            if let run = github.live.first(where: { $0.id == id }) {
+                switch run.state {
+                case .running: Text("\(run.checks.filter(\.done).count)/\(run.checks.count)").font(.islandNumber(12, .medium))
+                    .foregroundStyle(Palette.secondaryLabel)
+                case .waiting: Text("Waiting").font(.island(12, .semibold)).foregroundStyle(Palette.secondaryLabel)
+                case .passed: Text("Passed").font(.island(12, .semibold)).foregroundStyle(Palette.green)
+                case .failed: Text("Failed").font(.island(12, .semibold)).foregroundStyle(Palette.red)
+                }
+            }
+        case .pullRequest(let id):
+            if let item = github.pullRequests.first(where: { $0.id == id }) {
+                Text(PullRequestCopy.state(item.kind)).font(.island(12, .semibold)).foregroundStyle(PullRequestCopy.tint(item.kind))
+            }
         case .usage:
             if let window = hub.usage?.fiveHour ?? hub.usage?.weekly {
                 Text("\(Int(window.used))% · resets \(window.resetsAt.formatted(date: .omitted, time: .shortened))")

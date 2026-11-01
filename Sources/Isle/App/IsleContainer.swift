@@ -18,6 +18,7 @@ final class IsleContainer {
     let audio = AudioModel()
     let keepAwake = KeepAwakeModel()
     let hub = ActivityHub()
+    let github = GitHubModel()
     private lazy var server = ActivityServer { [hub] line in await hub.handle(line) }
     /// The island opened itself for an agent's request (so it closes again once answered).
     private var openedForRequest = false
@@ -43,6 +44,7 @@ final class IsleContainer {
             if hub.hasAgent { live.append(.agent) }
             if hub.hasTask { live.append(.task) }
             if hub.isNearLimit { live.append(.usage) }
+            if !github.live.isEmpty { live.append(.ci) }
             if timer.isActive { live.append(.timer) }
             if nowPlaying.isActive { live.append(.nowPlaying) }
             if calendar.current() != nil { live.append(.calendar) }
@@ -72,6 +74,22 @@ final class IsleContainer {
         hub.isEnabled = { p.agents }
         hub.onFinish = { [unowned self] in engine.present(.finished($0)) }
         hub.onLimit = { [unowned self] in engine.present(.limit($0)) }
+        hub.onPush = { [unowned self] folder, host in github.pushed(from: folder, host: host) }
+        github.ciEnabled = { p.githubCI }
+        github.reviewsEnabled = { p.githubReviews }
+        github.isInFront = { [unowned self] host in host != nil && host == hub.frontmost }
+        github.onFinish = { [unowned self] in engine.present(.finished($0)) }
+        github.onPullRequest = { [unowned self] item in
+            let event: PullRequestInfo.Event? = switch item.kind {
+            case .reviewRequested: .reviewRequested
+            case .approved: .approved
+            case .changesRequested: .changesRequested
+            case .activity: nil
+            }
+            if let event {
+                engine.present(.pullRequest(PullRequestInfo(title: item.title, repo: item.repo, number: item.number, event: event)))
+            }
+        }
         // the open shelf already shows the result; the banner is for when you've moved on
         shelf.onFinish = { [unowned self] in if !engine.isExpanded { engine.present(.finished($0)) } }
         hub.onRequest = { [unowned self] in
@@ -122,6 +140,7 @@ final class IsleContainer {
         hub.start()
         server.start()
         ClaudeConnector.upgradeIfNeeded()
+        github.start()
         bluetooth.start()
         calendar.start()
     }
@@ -145,6 +164,7 @@ extension View {
             .environment(c.audio)
             .environment(c.keepAwake)
             .environment(c.hub)
+            .environment(c.github)
             .environment(c.shelf)
             .environment(\.openIsleSettings, OpenSettingsAction { c.openSettings() })
     }

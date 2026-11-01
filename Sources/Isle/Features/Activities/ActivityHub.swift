@@ -271,6 +271,9 @@ final class ActivityHub {
                 $0.detail = Self.doing(tool: tool, subject: Self.subject(tool: tool, input: input))
             }
         case "PostToolUse", "PostToolUseFailure":
+            if event == "PostToolUse", tool == "Bash", let command = input["command"] as? String, Self.isPush(command) {
+                onPush(Self.pushFolder(command, cwd: cwd), hosts[session])
+            }
             if tool == "Bash", let command = input["command"] as? String, Self.isTest(command) {
                 upsert(session, title: project, cwd: cwd) {
                     $0.lastTest = TestRun(command: command, passed: event == "PostToolUse" && !Self.failed(payload))
@@ -404,14 +407,18 @@ final class ActivityHub {
     /// How long a terminal command runs before it shows in the notch.
     @ObservationIgnored var longCommand: Duration = .seconds(30)
     @ObservationIgnored private var pendingCommands: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private var commandStarts: [String: (command: String, started: Date)] = [:]
+    @ObservationIgnored private var commandStarts: [String: (command: String, started: Date, cwd: String, host: pid_t?)] = [:]
+    /// A `git push` succeeded in this folder (from a terminal or an agent).
+    @ObservationIgnored var onPush: (String, pid_t?) -> Void = { _, _ in }
 
     /// A command started in a connected shell. It stays out of sight unless
     /// it's still running after `longCommand`.
     func shellStarted(id: String, command: String, cwd: String, ancestors: [pid_t] = []) {
-        guard !Self.isInteractive(command) else { return }
-        commandStarts[id] = (command, .now)
         let host = ancestors.isEmpty ? nil : resolveHost(ancestors)
+        // pushes are quick but start CI, so they're remembered even when short
+        if Self.isPush(command) { commandStarts[id] = (command, .now, cwd, host) }
+        guard !Self.isInteractive(command) else { return }
+        commandStarts[id] = (command, .now, cwd, host)
         let folder = (cwd as NSString).lastPathComponent
         pendingCommands[id] = Task { [weak self, delay = longCommand] in
             try? await Task.sleep(for: delay)
@@ -426,8 +433,9 @@ final class ActivityHub {
     /// The command ended: ✓ or ✗ if it ran long enough to be shown.
     func shellEnded(id: String, status: Int) {
         pendingCommands.removeValue(forKey: id)?.cancel()
-        guard let start = commandStarts.removeValue(forKey: id),
-              let index = activities.firstIndex(where: { $0.id == id }) else { return }
+        guard let start = commandStarts.removeValue(forKey: id) else { return }
+        if status == 0, Self.isPush(start.command) { onPush(start.cwd, start.host) }
+        guard let index = activities.firstIndex(where: { $0.id == id }) else { return }
         let activity = activities.remove(at: index)
         // Ctrl-C: you stopped it yourself; and you watched it if its terminal is in front
         guard status != 130, !isInFront(activity) else { return }
@@ -466,6 +474,40 @@ final class ActivityHub {
         case "commit": return !rest.contains { ["-m", "-F", "--no-edit", "--message", "-C"].contains($0) || $0.hasPrefix("-m") }
         case "rebase": return rest.contains("-i") || rest.contains("--interactive")
         default: return false
+        }
+    }
+
+    /// Where a push ran: `git -C dir push`, or `cd dir && git push`, else the session's folder.
+    static func pushFolder(_ command: String, cwd: String) -> String {
+        func resolve(_ path: String) -> String {
+            let unquoted = path.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            let expanded = (unquoted as NSString).expandingTildeInPath
+            return expanded.hasPrefix("/") ? expanded : (cwd as NSString).appendingPathComponent(expanded)
+        }
+        var folder = cwd
+        for segment in command.components(separatedBy: CharacterSet(charactersIn: ";|&")) {
+            let words = segment.split(separator: " ").map(String.init)
+            if words.first == "cd", words.count > 1 { folder = resolve(words[1]) }
+            if isPush(segment) {
+                if let c = words.firstIndex(of: "-C"), c + 1 < words.count { return resolve(words[c + 1]) }
+                return folder
+            }
+        }
+        return folder
+    }
+
+    /// `git push` (with any options), anywhere in a compound command.
+    static func isPush(_ command: String) -> Bool {
+        command.components(separatedBy: CharacterSet(charactersIn: ";|&")).contains { segment in
+            var words = Array(segment.split(separator: " ").map(String.init).drop { $0.contains("=") })
+            guard words.first == "git" else { return false }
+            words.removeFirst()
+            // skip git's own options, including the ones that take a value (-C dir, -c key=value)
+            while let word = words.first, word.hasPrefix("-") {
+                words.removeFirst()
+                if ["-C", "-c", "--git-dir", "--work-tree"].contains(word), !words.isEmpty { words.removeFirst() }
+            }
+            return words.first == "push"
         }
     }
 

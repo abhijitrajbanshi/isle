@@ -155,6 +155,18 @@ private struct AlertBanner: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { calendar.openCalendar() }
+        case .pullRequest(let info):
+            HStack(spacing: 13) {
+                Image(systemName: PullRequestCopy.symbol(info.event))
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(info.event == .approved ? Palette.green
+                                     : info.event == .changesRequested ? Palette.red : Palette.amber)
+                    .frame(width: 32)
+                Titles(title: info.title,
+                       subtitle: "\(info.repo) #\(info.number) · " + (info.event == .reviewRequested ? "Review requested"
+                           : info.event == .approved ? "Approved" : "Changes requested"))
+                Spacer(minLength: 8)
+            }
         case .limit(let info):
             HStack(spacing: 13) {
                 Image(systemName: "gauge.with.dots.needle.67percent")

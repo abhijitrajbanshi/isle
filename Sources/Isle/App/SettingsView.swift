@@ -97,6 +97,7 @@ private struct SidebarHeader: View {
 
 private struct AgentsPane: View {
     @Environment(Preferences.self) private var preferences
+    @Environment(GitHubModel.self) private var github
     @State private var connected = ClaudeConnector.isConnected
     @State private var shellConnected = ShellConnector.isConnected
     @State private var error: String?
@@ -145,6 +146,22 @@ private struct AgentsPane: View {
                 Toggle("Show agents in the notch", isOn: $p.agents)
                 Toggle("Open the island when an agent needs permission", isOn: $p.openForRequests)
                     .disabled(!p.agents)
+            }
+
+            Section {
+                LabeledContent("Account") {
+                    if let login = github.signedIn {
+                        Label(login, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        Text("Run gh auth login in Terminal").foregroundStyle(.secondary)
+                    }
+                }
+                Toggle("CI on what you push", isOn: $p.githubCI)
+                Toggle("Pull requests waiting on you", isOn: $p.githubReviews)
+            } header: {
+                Text("GitHub")
+            } footer: {
+                Note("Uses your gh login; nothing new to sign into. After a push from a connected terminal or an agent, the notch follows its checks and tells you when they pass or fail. Review requests and reviews on your pull requests are checked every two minutes while the screen is on.")
             }
 
             Section {
