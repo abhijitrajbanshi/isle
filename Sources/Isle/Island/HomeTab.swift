@@ -6,7 +6,7 @@ import SwiftUI
 /// size: it's as tall as what's in it. Clicking a row brings it up.
 struct StackView: View {
     enum Hero: Hashable {
-        case request(String), call(String), music, agent(String), timer, task(String), quiet
+        case request(String), call(String), music, agent(String), timer, task(String), summary, quiet
     }
     enum Panel { case output, awake }
 
@@ -16,6 +16,7 @@ struct StackView: View {
     @Environment(CalendarModel.self) private var calendar
     @Environment(TimerModel.self) private var timer
     @Environment(AudioModel.self) private var audio
+    @Environment(ShelfModel.self) private var shelf
     @State private var pinned: Hero?
     @State private var panel: Panel?
 
@@ -29,6 +30,7 @@ struct StackView: View {
         list += agents.filter { $0.request == nil }.map { .agent($0.id) }
         if timer.isActive { list.append(.timer) }
         list += hub.live.filter { $0.kind == .task }.map { .task($0.id) }
+        if shelf.summary != nil { list.append(.summary) }
         return list
     }
 
@@ -103,6 +105,7 @@ struct StackView: View {
         case .music: "Now playing"
         case .timer: "Timer"
         case .task: "Task"
+        case .summary: "Summary"
         case .quiet: Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))
         }
     }
@@ -149,6 +152,8 @@ struct StackView: View {
             TimerTab()
         case .task(let id):
             if let activity = hub.live.first(where: { $0.id == id }) { TaskCard(activity: activity) }
+        case .summary:
+            if let summary = shelf.summary { SummaryCard(summary: summary) }
         case .quiet:
             QuietCard { panel = .awake }
         }
@@ -164,6 +169,7 @@ private struct StackRow: View {
     @Environment(ActivityHub.self) private var hub
     @Environment(NowPlayingModel.self) private var player
     @Environment(CalendarModel.self) private var calendar
+    @Environment(ShelfModel.self) private var shelf
     @State private var isHovering = false
 
     var body: some View {
@@ -198,6 +204,8 @@ private struct StackRow: View {
             Image(systemName: "video.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.green)
         case .timer:
             Image(systemName: "timer").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.orange)
+        case .summary:
+            Image(systemName: "text.alignleft").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
         case .task(let id):
             ProgressGlyph(progress: hub.live.first { $0.id == id }?.progress, size: 13)
         case .quiet:
@@ -219,6 +227,8 @@ private struct StackRow: View {
             Text(calendar.upcoming.first { $0.id == id }?.title ?? "Meeting")
         case .timer:
             Text("Timer")
+        case .summary:
+            Text("Summary") + Text("  \(shelf.summary?.file ?? "")").foregroundStyle(Palette.tertiaryLabel)
         case .quiet:
             EmptyView()
         }
@@ -237,6 +247,9 @@ private struct StackRow: View {
             }
         case .timer:
             TimerCountdown(size: 12)
+        case .summary:
+            Text(shelf.summary?.isWorking == true ? "Reading" : "Ready")
+                .font(.island(12, .semibold)).foregroundStyle(Palette.secondaryLabel)
         case .quiet:
             EmptyView()
         }
@@ -254,6 +267,13 @@ private struct CallCard: View {
     @Environment(AudioModel.self) private var audio
 
     var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            CameraCheck()
+            details
+        }
+    }
+
+    private var details: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(event.title).font(.island(17, .semibold)).lineLimit(2)
             Text([event.meeting?.service.rawValue, event.start.formatted(date: .omitted, time: .shortened)]

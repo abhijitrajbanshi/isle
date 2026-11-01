@@ -6,15 +6,21 @@ struct ShelfTab: View {
     @Environment(IslandEngine.self) private var engine
 
     var body: some View {
-        Group {
-            if shelf.items.isEmpty {
-                DropZone(isTargeted: engine.isDropTargeted)
+        VStack(alignment: .leading, spacing: 12) {
+            if engine.isDraggingFile {
+                DropTargets()
             } else {
-                items
+                if let summary = shelf.summary {
+                    SummaryCard(summary: summary)
+                }
+                if shelf.items.isEmpty {
+                    if shelf.summary == nil { DropZone(isTargeted: engine.isDropTargeted).frame(height: 96) }
+                } else {
+                    items.frame(height: 86)
+                }
             }
         }
-        // the open island sizes itself to its content; the shelf needs room to drop onto
-        .frame(height: 112)
+        .animation(Motion.morph, value: engine.isDraggingFile)
         .onAppear { shelf.pruneMissing() }
     }
 
@@ -108,5 +114,146 @@ private struct ShelfTile: View {
         }
         .help(item.url.path)
         .accessibilityLabel(item.name)
+    }
+}
+
+// MARK: Drop targets
+
+/// While a file is being dragged to the notch: what to do with it.
+private struct DropTargets: View {
+    @Environment(ShelfModel.self) private var shelf
+
+    var body: some View {
+        HStack(spacing: 8) {
+            DropTarget(symbol: "tray.and.arrow.down.fill", title: "Keep") { shelf.add($0) }
+            DropTarget(symbol: "dot.radiowaves.up.forward", title: "AirDrop") { urls in
+                shelf.airDrop(urls.map(ShelfModel.Item.init(url:)))
+            }
+            DropTarget(symbol: "photo", title: "Convert", detail: "to JPEG") { shelf.convert($0) }
+            DropTarget(symbol: "text.alignleft", title: "Summarise",
+                       detail: ShelfActions.canSummarise ? "on this Mac" : "needs Apple Intelligence",
+                       isEnabled: ShelfActions.canSummarise) { urls in
+                if let first = urls.first { shelf.summarise(first) }
+            }
+        }
+        .frame(height: 96)
+    }
+}
+
+private struct DropTarget: View {
+    let symbol: String
+    let title: String
+    var detail: String? = nil
+    var isEnabled = true
+    let action: ([URL]) -> Void
+    @Environment(IslandEngine.self) private var engine
+    @State private var isTargeted = false
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol).font(.system(size: 20, weight: .medium))
+            Text(title).font(.island(12, .semibold))
+            if let detail {
+                Text(detail).font(.island(10)).opacity(0.6).lineLimit(1)
+            }
+        }
+        .foregroundStyle(isTargeted ? Color.black : (isEnabled ? Palette.label : Palette.tertiaryLabel))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(isTargeted ? Color.white : Palette.secondaryFill))
+        .scaleEffect(isTargeted ? 1.03 : 1)
+        .animation(Motion.land, value: isTargeted)
+        .modifier(DropHandler(isEnabled: isEnabled, isTargeted: $isTargeted) { providers in
+            loadURLs(providers) { action($0) }
+            engine.fileDragEnded()
+        })
+    }
+}
+
+/// AppKit-backed, so left out of offscreen snapshots (ImageRenderer can't draw it).
+private struct DropHandler: ViewModifier {
+    let isEnabled: Bool
+    @Binding var isTargeted: Bool
+    let perform: ([NSItemProvider]) -> Void
+    @Environment(\.isSnapshot) private var isSnapshot
+
+    func body(content: Content) -> some View {
+        if isSnapshot {
+            content
+        } else {
+            content.onDrop(of: [.fileURL], isTargeted: isEnabled ? $isTargeted : .constant(false)) { providers in
+                guard isEnabled else { return false }
+                perform(providers)
+                return true
+            }
+        }
+    }
+}
+
+/// Resolves dropped file URLs, then calls back on the main actor.
+func loadURLs(_ providers: [NSItemProvider], completion: @escaping @MainActor ([URL]) -> Void) {
+    let group = DispatchGroup()
+    let box = URLBox()
+    for provider in providers {
+        group.enter()
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            if let url { box.append(url) }
+            group.leave()
+        }
+    }
+    group.notify(queue: .main) {
+        MainActor.assumeIsolated { completion(box.urls) }
+    }
+}
+
+private final class URLBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [URL] = []
+    var urls: [URL] { lock.withLock { stored } }
+    func append(_ url: URL) { lock.withLock { stored.append(url) } }
+}
+
+// MARK: Summary
+
+/// A document's summary from the on-device model.
+struct SummaryCard: View {
+    let summary: ShelfModel.Summary
+    @Environment(ShelfModel.self) private var shelf
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "text.alignleft").font(.system(size: 11, weight: .semibold))
+                Text(summary.file).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 8)
+                if !summary.isWorking {
+                    if let text = summary.text {
+                        CapsuleButton(title: "Copy", isQuiet: true) {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(text, forType: .string)
+                        }
+                    }
+                    CapsuleButton(title: "Done", isQuiet: true) { shelf.dismissSummary() }
+                }
+            }
+            .font(.island(12, .semibold))
+            .foregroundStyle(Palette.secondaryLabel)
+            .frame(height: 24)
+
+            if let text = summary.text {
+                Text(text)
+                    .font(.island(13))
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let failure = summary.failure {
+                Text(failure).font(.island(13)).foregroundStyle(Palette.secondaryLabel)
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Reading it on this Mac").font(.island(13)).foregroundStyle(Palette.secondaryLabel)
+                }
+            }
+        }
     }
 }

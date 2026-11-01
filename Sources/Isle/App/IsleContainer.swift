@@ -70,6 +70,8 @@ final class IsleContainer {
         timer.onFinish = { [unowned self] in engine.present(.timerDone) }
         hub.isEnabled = { p.agents }
         hub.onFinish = { [unowned self] in engine.present(.finished($0)) }
+        // the open shelf already shows the result; the banner is for when you've moved on
+        shelf.onFinish = { [unowned self] in if !engine.isExpanded { engine.present(.finished($0)) } }
         hub.onRequest = { [unowned self] in
             guard preferences.openForRequests, !engine.isExpanded else { return }
             engine.tab = .home

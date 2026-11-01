@@ -1,4 +1,5 @@
 import AppKit
+import IsleKit
 import Observation
 import QuickLookThumbnailing
 
@@ -12,8 +13,19 @@ final class ShelfModel {
         var name: String { url.lastPathComponent }
     }
 
+    /// A summary being written, or the last one written.
+    struct Summary: Equatable {
+        let file: String
+        var text: String?
+        var failure: String?
+        var isWorking: Bool { text == nil && failure == nil }
+    }
+
     private(set) var items: [Item] = []
     private(set) var thumbnails: [URL: NSImage] = [:]
+    private(set) var summary: Summary?
+    /// Reports conversions and finished summaries (the "done" banner).
+    @ObservationIgnored var onFinish: (FinishedInfo) -> Void = { _ in }
 
     @ObservationIgnored private let defaults: UserDefaults
     private static let key = "shelf.paths"
@@ -67,6 +79,42 @@ final class ShelfModel {
         guard let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: urls) else { return }
         service.perform(withItems: urls)
     }
+
+    // MARK: Actions
+
+    /// Converts images to JPEG and keeps the results on the shelf.
+    func convert(_ urls: [URL]) {
+        var made: [URL] = []
+        var failure: String?
+        for url in urls {
+            do { made.append(try ShelfActions.convertToJPEG(url)) } catch { failure = error.localizedDescription }
+        }
+        add(made)
+        if let first = made.first {
+            onFinish(FinishedInfo(title: made.count == 1 ? first.lastPathComponent : "\(made.count) JPEGs",
+                                  detail: "Converted and kept on the shelf", symbol: "checkmark", succeeded: true))
+        } else {
+            onFinish(FinishedInfo(title: "Couldn't convert", detail: failure ?? "", symbol: "xmark", succeeded: false))
+        }
+    }
+
+    func summarise(_ url: URL) {
+        summary = Summary(file: url.lastPathComponent)
+        Task {
+            do {
+                let text = try await ShelfActions.summarise(url)
+                summary = Summary(file: url.lastPathComponent, text: text)
+                onFinish(FinishedInfo(title: "Summary ready", detail: url.lastPathComponent,
+                                      symbol: "checkmark", succeeded: true))
+            } catch {
+                summary = Summary(file: url.lastPathComponent, failure: error.localizedDescription)
+            }
+        }
+    }
+
+    func dismissSummary() { summary = nil }
+
+    func previewSummary(_ summary: Summary) { self.summary = summary }
 
     func thumbnail(for url: URL) -> NSImage {
         thumbnails[url] ?? NSWorkspace.shared.icon(forFile: url.path)

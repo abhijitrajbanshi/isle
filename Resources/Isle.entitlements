@@ -9,5 +9,8 @@
 	<!-- Upcoming events -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
+	<!-- Check camera, before a call -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
 </dict>
 </plist>

@@ -108,6 +108,15 @@ enum SnapshotRenderer {
             c.engine.expand(tab: .timer)
         },
         Scene(name: "21-open-shelf") { $0.engine.expand(tab: .shelf) },
+        Scene(name: "22-open-shelf-dropping") { $0.engine.fileDragEnteredDropZone() },
+        Scene(name: "23-open-summary") { c in
+            c.shelf.previewSummary(ShelfModel.Summary(file: "Q3 planning.pdf", text: """
+                • Revenue grew 18% on the back of the new Mac app.
+                • Hiring pauses until January; two roles stay open.
+                • The 2.0 launch moves to the second week of November.
+                """))
+            c.engine.expand(tab: .shelf)
+        },
     ]
 
     static func agent(state: ActivityHub.Activity.State) -> ActivityHub.Activity {

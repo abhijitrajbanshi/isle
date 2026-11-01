@@ -56,6 +56,8 @@ nothing shows twice.
 
 * **Meetings** — finds the call link in an event's URL, location or notes;
   Join from the notch, the five-minute banner or the expanded island.
+  **Check camera** shows a small mirror before you join; the camera runs only
+  while you're looking at it.
 * **Microphone mute** — one click mutes the Mac's microphone for every app
   (Zoom, Teams, the browser), with the state shown in the notch.
 * **Sound output** — switch between AirPods, speakers and displays from the
@@ -65,9 +67,11 @@ nothing shows twice.
 * **Timer** presets from the right-click menu.
 * **Auto-updates** — checks GitHub once a day and installs signed updates (Sparkle); “Check for Updates…” in the menu bar and Settings.
 
-* **File Shelf** — drag a file onto the notch and the island opens a shelf.
-  Files stay there; drag them out, open them, show them in Finder or send them
-  over **AirDrop**.
+* **File Shelf** — drag a file to the notch and pick what happens as you let
+  go: **Keep** it on the shelf (until you clear it), **AirDrop** it,
+  **Convert** an image to JPEG next to the original, or **Summarise** a PDF or
+  document with Apple's on-device model (macOS 26 with Apple Intelligence;
+  nothing leaves the Mac).
 * Hover-to-expand with an adjustable delay, or click-to-expand.
 * Trackpad haptic tick when the island opens.
 * Works on Macs **without** a notch: the island hangs from the menu bar as a

@@ -30,6 +30,8 @@
 	<string>public.app-category.utilities</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Isle shows a small mirror before a call, only when you click Check camera.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Isle shows an alert when your AirPods or other Bluetooth devices connect.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
