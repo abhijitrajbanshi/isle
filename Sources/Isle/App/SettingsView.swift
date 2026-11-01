@@ -98,6 +98,7 @@ private struct SidebarHeader: View {
 private struct AgentsPane: View {
     @Environment(Preferences.self) private var preferences
     @State private var connected = ClaudeConnector.isConnected
+    @State private var shellConnected = ShellConnector.isConnected
     @State private var error: String?
     @State private var copied = false
 
@@ -147,6 +148,27 @@ private struct AgentsPane: View {
             }
 
             Section {
+                LabeledContent("Long commands") {
+                    if shellConnected {
+                        Menu {
+                            Button("Disconnect") { changeShell(ShellConnector.disconnect) }
+                        } label: {
+                            Label("Connected", systemImage: "checkmark.circle.fill")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .foregroundStyle(.green)
+                    } else {
+                        Button("Connect") { changeShell(ShellConnector.connect) }
+                    }
+                }
+            } header: {
+                Text("Terminal")
+            } footer: {
+                Note("Any command that runs longer than 30 seconds shows in the notch, and you get ✓ or ✗ when it ends, unless its terminal is in front. Connecting adds three lines to ~/.zshrc and keeps a backup; new terminal windows pick it up.")
+            }
+
+            Section {
                 LabeledContent("Command") {
                     HStack(spacing: 8) {
                         Text("isle").font(.system(.body, design: .monospaced))
@@ -180,6 +202,16 @@ private struct AgentsPane: View {
             self.error = error.localizedDescription
         }
         connected = ClaudeConnector.isConnected
+    }
+
+    private func changeShell(_ action: () throws -> Void) {
+        do {
+            try action()
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
+        }
+        shellConnected = ShellConnector.isConnected
     }
 }
 

@@ -131,6 +131,15 @@ extension ActivityHub {
             }
             // no decision: Claude shows its normal prompt
             return Self.reply(Self.answer(decision, to: request))
+        case "shell":
+            let id = message["id"] as? String ?? ""
+            if message["op"] as? String == "start" {
+                shellStarted(id: id, command: message["command"] as? String ?? "", cwd: message["cwd"] as? String ?? "",
+                             ancestors: (message["ancestors"] as? [Int] ?? []).map { pid_t($0) })
+            } else {
+                shellEnded(id: id, status: message["status"] as? Int ?? 0)
+            }
+            return Self.reply(["ok": true])
         case "status":
             status(message["payload"] as? [String: Any] ?? [:])
             return Self.reply(["ok": true])

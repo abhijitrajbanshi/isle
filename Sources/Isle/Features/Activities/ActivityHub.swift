@@ -399,6 +399,82 @@ final class ActivityHub {
         }
     }
 
+    // MARK: Terminal commands (shell integration)
+
+    /// How long a terminal command runs before it shows in the notch.
+    @ObservationIgnored var longCommand: Duration = .seconds(30)
+    @ObservationIgnored private var pendingCommands: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var commandStarts: [String: (command: String, started: Date)] = [:]
+
+    /// A command started in a connected shell. It stays out of sight unless
+    /// it's still running after `longCommand`.
+    func shellStarted(id: String, command: String, cwd: String, ancestors: [pid_t] = []) {
+        guard !Self.isInteractive(command) else { return }
+        commandStarts[id] = (command, .now)
+        let host = ancestors.isEmpty ? nil : resolveHost(ancestors)
+        let folder = (cwd as NSString).lastPathComponent
+        pendingCommands[id] = Task { [weak self, delay = longCommand] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self, let start = self.commandStarts[id] else { return }
+            self.pendingCommands[id] = nil
+            self.activities.append(Activity(id: id, kind: .task, title: Self.short(command), detail: folder,
+                                            state: .working, progress: nil, started: start.started, request: nil,
+                                            host: host, cwd: cwd))
+        }
+    }
+
+    /// The command ended: ✓ or ✗ if it ran long enough to be shown.
+    func shellEnded(id: String, status: Int) {
+        pendingCommands.removeValue(forKey: id)?.cancel()
+        guard let start = commandStarts.removeValue(forKey: id),
+              let index = activities.firstIndex(where: { $0.id == id }) else { return }
+        let activity = activities.remove(at: index)
+        // Ctrl-C: you stopped it yourself; and you watched it if its terminal is in front
+        guard status != 130, !isInFront(activity) else { return }
+        let seconds = Int(Date.now.timeIntervalSince(start.started))
+        let took = String(format: "%d:%02d", seconds / 60, seconds % 60)
+        onFinish(FinishedInfo(title: activity.title,
+                              detail: status == 0 ? "Finished in \(took)" : "Failed after \(took) · exit \(status)",
+                              symbol: status == 0 ? "checkmark" : "xmark", succeeded: status == 0))
+    }
+
+    /// Editors, pagers, remote shells and REPLs run as long as you use them,
+    /// anywhere in a compound command.
+    static func isInteractive(_ command: String) -> Bool {
+        // following logs and serving forever
+        if command.contains("tail -f") || command.contains("--watch") || command.hasSuffix("&") { return true }
+        let segments = command.components(separatedBy: CharacterSet(charactersIn: ";|&"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return segments.isEmpty || segments.contains(where: isInteractiveProgram)
+    }
+
+    private static func isInteractiveProgram(_ command: String) -> Bool {
+        let words = command.split(separator: " ").map(String.init)
+            .drop { $0.contains("=") || $0 == "sudo" || $0 == "time" || $0 == "exec" }
+        guard let first = words.first.map({ ($0 as NSString).lastPathComponent }) else { return true }
+        let interactive: Set<String> = [
+            "vim", "nvim", "vi", "nano", "emacs", "hx", "micro", "ssh", "mosh", "less", "more", "man", "top", "htop",
+            "btop", "tmux", "screen", "claude", "codex", "gemini", "aider", "python", "python3", "node", "irb",
+            "ipython", "psql", "mysql", "sqlite3", "redis-cli", "watch", "fzf", "lazygit", "tig", "k9s", "ranger",
+            "yazi", "zsh", "bash", "fish", "sh", "su", "login", "open", "code", "cursor", "xed",
+        ]
+        if interactive.contains(first) { return true }
+        // git opens an editor for a commit without a message, and for an interactive rebase
+        guard first == "git", words.count > 1 else { return false }
+        let rest = Array(words.dropFirst(2))
+        switch words[words.index(after: words.startIndex)] {
+        case "commit": return !rest.contains { ["-m", "-F", "--no-edit", "--message", "-C"].contains($0) || $0.hasPrefix("-m") }
+        case "rebase": return rest.contains("-i") || rest.contains("--interactive")
+        default: return false
+        }
+    }
+
+    /// The command as a title: the program and its first arguments.
+    static func short(_ command: String) -> String {
+        let flat = command.replacingOccurrences(of: "\n", with: " ")
+        return flat.count > 32 ? String(flat.prefix(31)) + "…" : flat
+    }
+
     // MARK: Tasks (`isle run`, `isle progress`)
 
     func task(id: String, title: String, detail: String?, progress: Double?) {

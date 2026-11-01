@@ -106,6 +106,41 @@ case "hook":
     }
     exit(0)
 
+case "shell-init":
+    // Printed into zsh by `source <(isle shell-init zsh)`: reports each
+    // command's start and end in the background (`&!`: no job messages, and
+    // still a child of the shell, so Isle can tell which terminal it's in).
+    let me = CommandLine.arguments[0]
+    print(#"""
+    zmodload zsh/datetime 2>/dev/null
+    typeset -g __isle_cmd="" __isle_id=""
+    __isle_preexec() {
+      __isle_cmd="$1"; __isle_id="$$-$EPOCHREALTIME"
+      "\#(me)" shell start "$__isle_id" "$PWD" "$1" >/dev/null 2>&1 &!
+    }
+    __isle_precmd() {
+      local isle_status=$?
+      [[ -z $__isle_id ]] && return
+      "\#(me)" shell end "$__isle_id" "$isle_status" >/dev/null 2>&1 &!
+      __isle_id=""
+    }
+    autoload -Uz add-zsh-hook
+    add-zsh-hook preexec __isle_preexec
+    add-zsh-hook precmd __isle_precmd
+    """#)
+    exit(0)
+
+case "shell":
+    // isle shell start ID FOLDER COMMAND… | isle shell end ID STATUS
+    guard args.count >= 3 else { usage() }
+    if args[1] == "start", args.count >= 4 {
+        _ = send(["kind": "shell", "op": "start", "id": args[2], "cwd": args[3],
+                  "command": args[4...].joined(separator: " "), "ancestors": ancestors()])
+    } else if args[1] == "end" {
+        _ = send(["kind": "shell", "op": "end", "id": args[2], "status": Int(args.count > 3 ? args[3] : "0") ?? 0])
+    }
+    exit(0)
+
 case "statusline":
     // Claude Code's status line: forward the session's numbers to Isle, and
     // print a short line for Claude Code to show.
