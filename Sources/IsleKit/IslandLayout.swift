@@ -13,6 +13,10 @@ public struct IslandLayout: Equatable, Sendable {
         self.expandedHeight = expandedHeight
     }
 
+    /// The open island never grows past this; anything taller scrolls out of
+    /// the bottom rather than pushing the top under the notch.
+    public static let maxExpandedHeight: CGFloat = 440
+
     /// Width of the open island.
     public var expandedWidth: CGFloat { max(notchWidth + 375, 560) }
 
@@ -51,7 +55,8 @@ public struct IslandLayout: Equatable, Sendable {
             }
 
         case .expanded:
-            return IslandShape(width: expandedWidth, height: max(expandedHeight, notchHeight + 60),
+            return IslandShape(width: expandedWidth,
+                               height: min(max(expandedHeight, notchHeight + 60), Self.maxExpandedHeight),
                                shoulder: 12, radius: 30)
         }
     }

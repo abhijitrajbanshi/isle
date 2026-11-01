@@ -65,8 +65,16 @@ struct StackView: View {
             .padding(.top, 8)
             if panel == nil, !rows.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(rows, id: \.self) { row in
+                    // four rows at most, so the island stays a glance
+                    ForEach(rows.prefix(4), id: \.self) { row in
                         StackRow(hero: row) { pinned = row }
+                    }
+                    if rows.count > 4 {
+                        Text("and \(rows.count - 4) more")
+                            .font(.island(12)).foregroundStyle(Palette.tertiaryLabel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 28)
+                            .overlay(alignment: .top) { Rectangle().fill(Palette.hairline).frame(height: 0.5) }
                     }
                 }
                 .padding(.top, 14)

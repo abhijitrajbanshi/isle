@@ -238,4 +238,9 @@ struct ActivityHubTests {
         #expect(ActivityHub.program("FOO=1 /usr/bin/make -j8") == "make")
         #expect(ActivityHub.program("cd /tmp") == "a command")
     }
+
+    @Test func summariesArePlainText() {
+        #expect(ActivityHub.plain("The work is pushed as **45da31f** in `main`.") == "The work is pushed as 45da31f in main.")
+        #expect(ActivityHub.plain("## Done: [PR](https://x.y/1)") == "Done: PR")
+    }
 }

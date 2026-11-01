@@ -143,6 +143,20 @@ enum SnapshotRenderer {
             c.hub.preview([done])
             c.engine.expand(tab: .home)
         },
+        Scene(name: "27b-open-crowded") { c in
+            var done = agent(state: .review)
+            done.review = .init(summary: ActivityHub.plain("CI and pull requests work on your real GitHub account. The work is committed and pushed as **45da31f**."),
+                                minutes: 0, loaded: true)
+            done.host = 1
+            c.hub.preview([done, agent(state: .working)], usage: sampleUsage(40))
+            playing(c)
+            c.github.preview(runs: [], pullRequests: (1...4).map { n in
+                .init(id: "\(n)", title: "T13\(n)113: Added dropship for unavailable products with vendor", repo: "acme/shop",
+                      number: 430 + n, url: URL(string: "https://github.com/acme/shop/pull/\(430 + n)")!,
+                      kind: .reviewRequested, updated: .now)
+            })
+            c.engine.expand(tab: .home)
+        },
         Scene(name: "28-open-usage") { c in
             var a = agent(state: .working)
             a.meter = .init(contextPercent: 64, costUSD: 4.2)
@@ -253,7 +267,7 @@ enum SnapshotRenderer {
                 .fill(.black)
                 .frame(width: notch.width, height: notch.height)
         }
-        .frame(width: 900, height: 240)
+        .frame(width: 900, height: 500)
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2

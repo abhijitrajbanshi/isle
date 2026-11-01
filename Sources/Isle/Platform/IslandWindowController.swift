@@ -29,7 +29,9 @@ final class IslandWindowController {
     private var screen: NSScreen?
 
     /// Panel size: large enough for the expanded island plus its shadow.
-    private static let canvas = CGSize(width: 840, height: 280)
+    /// Transparent and click-through outside the island, so it can be tall:
+    /// room for the open island at its tallest (`IslandLayout.maxExpandedHeight`) and its shadow.
+    private static let canvas = CGSize(width: 840, height: IslandLayout.maxExpandedHeight + 60)
 
     init(container: IsleContainer) {
         self.container = container

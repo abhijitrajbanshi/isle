@@ -323,7 +323,7 @@ final class ActivityHub {
     private func finish(_ index: Int, summary: String?) {
         let activity = activities[index]
         let minutes = Int(Date.now.timeIntervalSince(activity.started) / 60)
-        let line = (summary ?? "").split(separator: "\n").first.map(String.init) ?? ""
+        let line = Self.plain((summary ?? "").split(separator: "\n").first.map(String.init) ?? "")
         activities[index].state = .review
         activities[index].detail = "Ready for review"
         activities[index].review = Review(summary: line, minutes: minutes,
@@ -643,6 +643,13 @@ final class ActivityHub {
             return name + second
         }
         return "a command"
+    }
+
+    /// Claude writes Markdown; the island shows text: no **, `, # or links.
+    static func plain(_ markdown: String) -> String {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        let text = (try? AttributedString(markdown: markdown, options: options)).map { String($0.characters) } ?? markdown
+        return text.trimmingCharacters(in: CharacterSet(charactersIn: "# ").union(.whitespaces))
     }
 
     /// Test runners worth reporting on.
