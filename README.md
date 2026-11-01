@@ -1,10 +1,14 @@
 # Isle
 
-The iPhone Dynamic Island, for the MacBook notch. Native Swift + SwiftUI,
-Apple Silicon, macOS 14 or later. See [FEATURES.md](FEATURES.md) for the full
-feature list.
+The notch that does your waiting for you. Isle is where the things you're
+waiting on report back: Claude Code asking for permission (allow it from the
+notch), a build finishing, a call about to start, your music. It's black,
+quiet, and gone when there's nothing to say.
 
-<img src="docs/demo-black.gif" width="680" alt="Isle: music, the opened player, a timer beside the music, and AirPods, charging and Caps Lock alerts">
+Native Swift + SwiftUI, Apple silicon, macOS 14 or later, open source. See
+[FEATURES.md](FEATURES.md) for everything it does.
+
+<img src="docs/demo-black.gif" width="680" alt="Isle: music beside the notch, Claude Code asking to run a command and being allowed from the notch, a build finishing, the player, and a call with Join">
 
 Also in [Liquid Glass](docs/demo-glass.gif), and as full-resolution video:
 [Black](docs/demo-black.mp4) · [Liquid Glass](docs/demo-glass.mp4).
@@ -20,6 +24,23 @@ Also in [Liquid Glass](docs/demo-glass.gif), and as full-resolution video:
    **Open Anyway**. You only do this once.
 
 Requires an Apple silicon Mac with macOS 14 Sonoma or later.
+
+## Agents and scripts
+
+**Claude Code:** open Isle's Settings → Agents → **Connect**. Isle adds its
+hooks to `~/.claude/settings.json` (keeping a backup) and from then on shows
+what each session is doing, opens when Claude asks for permission (Allow /
+Deny right there), and tells you when it's done. If you don't answer within
+45 seconds, Claude asks you as usual; if Isle isn't running, nothing changes.
+
+**Anything else:** the bundled `isle` command reports to the notch.
+
+```bash
+alias isle=/Applications/Isle.app/Contents/Helpers/isle
+isle run -- make release          # live while it runs, ✓ or ✗ when it ends
+isle progress upload 0.42 --title "Uploading" --detail "photos.zip"
+isle done upload
+```
 
 ## Build & run
 

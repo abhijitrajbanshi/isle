@@ -15,6 +15,12 @@ final class IsleContainer {
     let calendar = CalendarModel()
     let power = PowerMonitor()
     let privacy = PrivacyMonitor()
+    let audio = AudioModel()
+    let keepAwake = KeepAwakeModel()
+    let hub = ActivityHub()
+    private lazy var server = ActivityServer { [hub] line in await hub.handle(line) }
+    /// The island opened itself for an agent's request (so it closes again once answered).
+    private var openedForRequest = false
     let shelf: ShelfModel
 
     private let capsLock = CapsLockMonitor()
@@ -34,6 +40,8 @@ final class IsleContainer {
     private func wire() {
         engine.activities = { [unowned self] in
             var live: [LiveActivity] = []
+            if hub.hasAgent { live.append(.agent) }
+            if hub.hasTask { live.append(.task) }
             if timer.isActive { live.append(.timer) }
             if nowPlaying.isActive { live.append(.nowPlaying) }
             if calendar.current() != nil { live.append(.calendar) }
@@ -60,8 +68,35 @@ final class IsleContainer {
         privacy.isEnabled = { p.privacyIndicators }
         nowPlaying.isEnabled = { p.nowPlaying }
         timer.onFinish = { [unowned self] in engine.present(.timerDone) }
+        hub.isEnabled = { p.agents }
+        hub.onFinish = { [unowned self] in engine.present(.finished($0)) }
+        hub.onRequest = { [unowned self] in
+            guard preferences.openForRequests, !engine.isExpanded else { return }
+            engine.tab = .home
+            engine.expand()
+            openedForRequest = true
+        }
+        closeAfterRequests()
 
         syncEngineWithPreferences()
+    }
+
+    /// Closes the island it opened for a request once nothing is waiting,
+    /// unless you've since moved onto it.
+    private func closeAfterRequests() {
+        withObservationTracking {
+            _ = hub.needsYou
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.requestsChanged() }
+        }
+    }
+
+    private func requestsChanged() {
+        if openedForRequest, hub.needsYou == nil {
+            openedForRequest = false
+            if !engine.isHovering { engine.collapse() }
+        }
+        closeAfterRequests()
     }
 
     /// Keeps engine behaviour in step with Settings, re-arming on every change.
@@ -79,12 +114,16 @@ final class IsleContainer {
         power.start()
         capsLock.start()
         privacy.start()
+        audio.start()
+        hub.start()
+        server.start()
         bluetooth.start()
         calendar.start()
     }
 
     func stop() {
         nowPlayingService.stop()
+        keepAwake.stop()
     }
 }
 
@@ -98,6 +137,9 @@ extension View {
             .environment(c.calendar)
             .environment(c.power)
             .environment(c.privacy)
+            .environment(c.audio)
+            .environment(c.keepAwake)
+            .environment(c.hub)
             .environment(c.shelf)
             .environment(\.openIsleSettings, OpenSettingsAction { c.openSettings() })
     }

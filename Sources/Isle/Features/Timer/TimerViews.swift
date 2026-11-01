@@ -45,26 +45,6 @@ struct TimerBubble: View {
     }
 }
 
-/// Compact card for the Home tab while a timer runs.
-struct TimerWidget: View {
-    @Environment(TimerModel.self) private var timer
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Timer").font(.island(11, .semibold)).foregroundStyle(Palette.orange)
-            TimerCountdown(size: 30, weight: .medium)
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                IslandButton(symbol: "xmark", label: "Cancel", size: 11, weight: .bold,
-                             fill: Palette.fill, diameter: 30) { timer.cancel() }
-                IslandButton(symbol: timer.isRunning ? "pause.fill" : "play.fill",
-                             label: timer.isRunning ? "Pause" : "Resume", size: 11, tint: Palette.orange,
-                             fill: Palette.orange.opacity(0.22), diameter: 30) { timer.toggle() }
-            }
-        }
-    }
-}
-
 struct TimerTab: View {
     @Environment(TimerModel.self) private var timer
 

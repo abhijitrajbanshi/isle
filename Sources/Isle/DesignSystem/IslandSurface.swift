@@ -18,7 +18,8 @@ enum IslandStyle: String, CaseIterable, Identifiable {
     }
 }
 
-/// The island's material, filling `shape`.
+/// The island's material, filling `shape`: opaque black, continuous with
+/// the hardware notch (or Liquid Glass, if chosen in Settings).
 struct IslandSurface<S: Shape>: View {
     let shape: S
     let style: IslandStyle
@@ -54,7 +55,7 @@ struct IslandSurface<S: Shape>: View {
     /// Pre-macOS 26 (or pre-Xcode 26 builds): the desktop blurred through the panel.
     private var frosted: some View {
         BehindWindowBlur()
-            .overlay(shape.fill(.black.opacity(0.3)))
+            .overlay(shape.fill(.black.opacity(0.35)))
             .clipShape(shape)
             .overlay(shape.stroke(.white.opacity(0.12), lineWidth: 0.5))
     }

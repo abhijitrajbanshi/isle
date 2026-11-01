@@ -26,8 +26,12 @@ public struct NotchMetrics: Equatable, Sendable {
 public enum LiveActivity: Int, Comparable, Hashable, Sendable, CaseIterable {
     case privacy
     case calendar
+    /// Anything posted through the activity API: builds, downloads, scripts.
+    case task
     case nowPlaying
     case timer
+    /// AI coding agents (Claude Code): working, waiting on you, done.
+    case agent
 
     public static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
 }
@@ -58,8 +62,19 @@ public struct EventInfo: Equatable, Sendable {
     public var title: String
     public var start: Date
     public var color: IslandColor
-    public init(title: String, start: Date, color: IslandColor) {
-        self.title = title; self.start = start; self.color = color
+    public var meeting: MeetingLink?
+    public init(title: String, start: Date, color: IslandColor, meeting: MeetingLink? = nil) {
+        self.title = title; self.start = start; self.color = color; self.meeting = meeting
+    }
+}
+
+public struct FinishedInfo: Equatable, Sendable {
+    public var title: String
+    public var detail: String
+    public var symbol: String
+    public var succeeded: Bool
+    public init(title: String, detail: String, symbol: String, succeeded: Bool) {
+        self.title = title; self.detail = detail; self.symbol = symbol; self.succeeded = succeeded
     }
 }
 
@@ -72,9 +87,11 @@ public enum IslandAlert: Equatable, Sendable {
     case device(DeviceInfo)
     case timerDone
     case eventSoon(EventInfo)
+    /// An agent or task finished (or failed).
+    case finished(FinishedInfo)
 
     public enum Kind: Hashable, Sendable {
-        case capsLock, power, lowBattery, device, timer, event
+        case capsLock, power, lowBattery, device, timer, event, finished
     }
 
     public enum Style: Sendable {
@@ -94,6 +111,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .device: .device
         case .timerDone: .timer
         case .eventSoon: .event
+        case .finished: .finished
         }
     }
 
@@ -101,7 +119,7 @@ public enum IslandAlert: Equatable, Sendable {
         switch self {
         case .capsLock: .hud
         case .power, .lowPowerMode: .wide
-        case .lowBattery, .device, .timerDone, .eventSoon: .banner
+        case .lowBattery, .device, .timerDone, .eventSoon, .finished: .banner
         }
     }
 
@@ -112,6 +130,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .power, .lowPowerMode: .milliseconds(2600)
         case .timerDone: .seconds(12)
         case .lowBattery, .device, .eventSoon: .seconds(4)
+        case .finished: .seconds(5)
         }
     }
 }

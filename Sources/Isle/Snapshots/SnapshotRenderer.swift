@@ -1,4 +1,5 @@
 import AppKit
+import CoreAudio
 import IsleKit
 import SwiftUI
 
@@ -26,7 +27,9 @@ enum SnapshotRenderer {
             preferences.style = .black
             let c = IsleContainer(preferences: preferences, metrics: .preview, defaults: defaults)
             c.power.preview(level: 82, charging: false)
+            c.keepAwake.stop()
             c.calendar.preview(sampleEvents)
+            c.audio.preview(outputs: sampleOutputs, current: 0, micMuted: false)
             scene.setup(c)
             if let image = render(c) {
                 write(image, to: directory.appendingPathComponent("\(scene.name).png"))
@@ -43,54 +46,102 @@ enum SnapshotRenderer {
             playing(c)
             c.engine.activities = { [.nowPlaying] }
         },
-        Scene(name: "04-compact-music-paused") { c in
-            c.nowPlaying.preview(title: "Midnight City", artist: "M83", playing: false, artwork: artwork, accent: accent)
-            c.engine.activities = { [.nowPlaying] }
+        Scene(name: "04-compact-agent-working") { c in
+            c.hub.preview([agent(state: .working)])
+            c.engine.activities = { [.agent] }
         },
-        Scene(name: "05-split-timer-music") { c in
+        Scene(name: "05-compact-agent-request") { c in
+            c.hub.preview([agent(state: .needsYou)])
+            c.engine.activities = { [.agent, .nowPlaying] }
+            playing(c)
+        },
+        Scene(name: "06-compact-task") { c in
+            c.hub.preview([build])
+            c.engine.activities = { [.task] }
+        },
+        Scene(name: "07-compact-meeting-join") { c in
+            c.calendar.preview([standup(startingIn: 60)])
+            c.engine.activities = { [.calendar] }
+        },
+        Scene(name: "08-compact-split-timer-music") { c in
             playing(c)
             c.timer.preview(remaining: 4 * 60 + 32, of: 600)
             c.engine.activities = { [.timer, .nowPlaying] }
         },
-        Scene(name: "06-compact-calendar") { c in
-            c.calendar.preview([.init(id: "a", title: "Design review", start: .now.addingTimeInterval(240),
-                                      end: .now.addingTimeInterval(3600), color: IslandColor(red: 0.35, green: 0.5, blue: 1))])
-            c.engine.activities = { [.calendar] }
+        Scene(name: "09-compact-privacy") { $0.engine.activities = { [.privacy] } },
+        Scene(name: "10-hud-capslock") { $0.engine.present(.capsLock(isOn: true)) },
+        Scene(name: "11-wide-charging") { $0.engine.present(.power(level: 82, isCharging: true)) },
+        Scene(name: "12-banner-finished") {
+            $0.engine.present(.finished(FinishedInfo(title: "isle is ready", detail: "Claude worked for 12 min",
+                                                     symbol: "checkmark", succeeded: true)))
         },
-        Scene(name: "07-compact-privacy") { $0.engine.activities = { [.privacy] } },
-        Scene(name: "08-hud-capslock") { $0.engine.present(.capsLock(isOn: true)) },
-        Scene(name: "09-wide-charging") { $0.engine.present(.power(level: 82, isCharging: true)) },
-        Scene(name: "10-wide-lowpower") { $0.engine.present(.lowPowerMode(isOn: true, level: 34)) },
-        Scene(name: "11-banner-airpods") {
+        Scene(name: "13-banner-meeting") {
+            $0.engine.present(.eventSoon(EventInfo(title: "Team stand-up", start: .now.addingTimeInterval(300),
+                                                   color: IslandColor(red: 0.3, green: 0.75, blue: 0.55),
+                                                   meeting: sampleMeeting)))
+        },
+        Scene(name: "14-banner-airpods") {
             $0.engine.present(.device(DeviceInfo(name: "AirPods Pro", symbol: "airpodspro", battery: 86, isConnected: true)))
         },
-        Scene(name: "12-banner-lowbattery") { $0.engine.present(.lowBattery(level: 10)) },
-        Scene(name: "13-banner-timer") { $0.engine.present(.timerDone) },
-        Scene(name: "14-banner-event") {
-            $0.engine.present(.eventSoon(EventInfo(title: "Design review", start: .now.addingTimeInterval(300),
-                                                   color: IslandColor(red: 0.35, green: 0.5, blue: 1))))
+        Scene(name: "15-open-request") { c in
+            playing(c)
+            c.hub.preview([agent(state: .needsYou), build])
+            c.engine.expand(tab: .home)
         },
-        Scene(name: "15-expanded-home") { c in
+        Scene(name: "16-open-music") { c in
+            playing(c)
+            c.hub.preview([agent(state: .working)])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "17-open-call") { c in
+            c.calendar.preview([standup(startingIn: 120)])
             playing(c)
             c.engine.expand(tab: .home)
         },
-        Scene(name: "16-expanded-home-empty") { $0.engine.expand(tab: .home) },
-        Scene(name: "17-expanded-home-timer") { c in
-            playing(c)
-            c.timer.preview(remaining: 272, of: 600)
+        Scene(name: "18-open-agent") { c in
+            c.hub.preview([agent(state: .working), build])
             c.engine.expand(tab: .home)
         },
-        Scene(name: "18-expanded-timer") { $0.engine.expand(tab: .timer) },
-        Scene(name: "19-expanded-timer-running") { c in
+        Scene(name: "19-open-quiet") { $0.engine.expand(tab: .home) },
+        Scene(name: "20-open-timer") { c in
             c.timer.preview(remaining: 272, of: 600)
             c.engine.expand(tab: .timer)
         },
-        Scene(name: "20-expanded-shelf") { $0.engine.expand(tab: .shelf) },
+        Scene(name: "21-open-shelf") { $0.engine.expand(tab: .shelf) },
     ]
+
+    static func agent(state: ActivityHub.Activity.State) -> ActivityHub.Activity {
+        ActivityHub.Activity(
+            id: "claude", kind: .agent, title: "isle",
+            detail: state == .needsYou ? "Running swift test" : "Editing IslandView.swift",
+            state: state, progress: nil, started: .now.addingTimeInterval(-252),
+            request: state == .needsYou
+                ? .init(id: UUID(), question: "Run this command?",
+                        subject: "swift test --filter MeetingLinkTests", tool: "Bash")
+                : nil)
+    }
+
+    static let build = ActivityHub.Activity(id: "build", kind: .task, title: "Archive Isle", detail: "Compiling 214 of 340",
+                                            state: .working, progress: 0.64, started: .now.addingTimeInterval(-95),
+                                            request: nil)
 
     private static func playing(_ c: IsleContainer) {
         c.nowPlaying.preview(title: "Midnight City — Extended Version", artist: "M83", playing: true,
                              artwork: artwork, accent: accent)
+    }
+
+    static let sampleOutputs: [(String, UInt32)] = [
+        ("AirPods Pro", kAudioDeviceTransportTypeBluetooth),
+        ("MacBook Pro Speakers", kAudioDeviceTransportTypeBuiltIn),
+        ("Studio Display", kAudioDeviceTransportTypeDisplayPort),
+    ]
+
+    static let sampleMeeting = MeetingLink(url: URL(string: "https://zoom.us/j/1234567890")!, service: .zoom)
+
+    static func standup(startingIn seconds: TimeInterval) -> CalendarModel.Event {
+        CalendarModel.Event(id: "standup", title: "Team stand-up", start: Date.now.addingTimeInterval(seconds),
+                            end: Date.now.addingTimeInterval(seconds + 900),
+                            color: IslandColor(red: 0.3, green: 0.75, blue: 0.55), meeting: sampleMeeting)
     }
 
     static let accent = Color(red: 1.0, green: 0.45, blue: 0.62)
@@ -132,6 +183,8 @@ enum SnapshotRenderer {
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
+        // the first pass measures the open island's content; the second draws it at that height
+        _ = renderer.cgImage
         return renderer.cgImage
     }
 

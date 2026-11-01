@@ -9,6 +9,8 @@ struct SettingsView: View {
     @Environment(PowerMonitor.self) private var power
     @Environment(Updater.self) private var updater
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var claudeConnected = ClaudeConnector.isConnected
+    @State private var claudeError: String?
 
     var body: some View {
         @Bindable var p = preferences
@@ -68,6 +70,30 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Show agents in the notch", isOn: $p.agents)
+                LabeledContent("Claude Code") {
+                    if claudeConnected {
+                        HStack(spacing: 10) {
+                            Label("Connected", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Button("Disconnect") { change(ClaudeConnector.disconnect) }
+                        }
+                    } else {
+                        Button("Connect") { change(ClaudeConnector.connect) }
+                    }
+                }
+                Toggle("Open the island when an agent asks for permission", isOn: $p.openForRequests)
+                    .disabled(!p.agents)
+                if let claudeError {
+                    Text(claudeError).foregroundStyle(.red).font(.callout)
+                }
+            } header: {
+                Text("Agents")
+            } footer: {
+                Text("Connecting adds Isle's hooks to ~/.claude/settings.json and keeps a backup next to it. Allow or deny Claude's requests from the notch; if you don't answer within 45 seconds, Claude asks you as usual. Scripts can report too: isle run -- make")
+            }
+
+            Section {
                 Toggle("Now Playing", isOn: $p.nowPlaying)
                 Toggle("Include browsers and all other apps", isOn: $p.allPlayers)
                     .disabled(!p.nowPlaying)
@@ -103,6 +129,16 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 470)
         .frame(minHeight: 560, idealHeight: 680)
+    }
+
+    private func change(_ action: () throws -> Void) {
+        do {
+            try action()
+            claudeError = nil
+        } catch {
+            claudeError = error.localizedDescription
+        }
+        claudeConnected = ClaudeConnector.isConnected
     }
 
     /// Shows each alert style in turn.

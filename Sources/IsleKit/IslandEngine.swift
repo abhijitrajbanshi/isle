@@ -64,7 +64,10 @@ public final class IslandEngine {
 
     // MARK: Derived
 
-    public var layout: IslandLayout { IslandLayout(metrics: metrics) }
+    /// Measured height of the open island's content, notch row included.
+    public var expandedHeight: CGFloat = 200
+
+    public var layout: IslandLayout { IslandLayout(metrics: metrics, expandedHeight: expandedHeight) }
 
     public var presentation: Presentation {
         if isExpanded { return .expanded }

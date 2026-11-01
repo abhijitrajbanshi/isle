@@ -29,6 +29,8 @@ struct CompactContent: View {
         case .timer: TimerCompactLeading()
         case .calendar: CalendarCompactLeading()
         case .privacy: PrivacyCompactLeading()
+        case .agent: ActivityCompactLeading(kind: .agent)
+        case .task: ActivityCompactLeading(kind: .task)
         }
     }
 
@@ -39,6 +41,8 @@ struct CompactContent: View {
         case .timer: TimerCountdown(size: 14)
         case .calendar: CalendarCompactTrailing()
         case .privacy: PrivacyDot()
+        case .agent: ActivityCompactTrailing(kind: .agent)
+        case .task: ActivityCompactTrailing(kind: .task)
         }
     }
 }
@@ -54,6 +58,8 @@ struct BubbleContent: View {
         case .timer: TimerBubble()
         case .calendar: CalendarCompactLeading()
         case .privacy: PrivacyDot()
+        case .agent: ActivityBubble(kind: .agent)
+        case .task: ActivityBubble(kind: .task)
         }
     }
 }

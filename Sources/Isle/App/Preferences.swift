@@ -21,6 +21,9 @@ final class Preferences {
     var allPlayers: Bool { didSet { save(allPlayers, "allPlayers") } }
     var calendar: Bool { didSet { save(calendar, "calendar") } }
     var privacyIndicators: Bool { didSet { save(privacyIndicators, "privacyIndicators") } }
+    var agents: Bool { didSet { save(agents, "agents") } }
+    /// Open the island by itself when an agent asks for permission.
+    var openForRequests: Bool { didSet { save(openForRequests, "openForRequests") } }
 
     var capsLockAlerts: Bool { didSet { save(capsLockAlerts, "capsLockAlerts") } }
     var powerAlerts: Bool { didSet { save(powerAlerts, "powerAlerts") } }
@@ -44,6 +47,8 @@ final class Preferences {
         hideInFullScreen = bool("hideInFullScreen")
         style = IslandStyle(rawValue: defaults.string(forKey: "islandStyle") ?? "") ?? .glass
         nowPlaying = bool("nowPlaying")
+        agents = bool("agents")
+        openForRequests = bool("openForRequests")
         allPlayers = bool("allPlayers")
         calendar = bool("calendar")
         privacyIndicators = bool("privacyIndicators")

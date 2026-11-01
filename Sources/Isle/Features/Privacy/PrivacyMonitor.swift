@@ -182,19 +182,25 @@ final class PrivacyMonitor {
 
 struct PrivacyCompactLeading: View {
     @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(AudioModel.self) private var audio
 
     var body: some View {
-        Image(systemName: privacy.symbol)
+        // an app is recording but the mic is muted: say so, it's what you'd want to check
+        let muted = !privacy.isCameraInUse && audio.isMicMuted
+        Image(systemName: muted ? "mic.slash.fill" : privacy.symbol)
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(privacy.tint)
+            .foregroundStyle(muted ? Palette.red : privacy.tint)
+            .contentTransition(.symbolEffect(.replace))
     }
 }
 
 struct PrivacyDot: View {
     @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(AudioModel.self) private var audio
 
     var body: some View {
-        Circle().fill(privacy.tint).frame(width: 7, height: 7)
-            .shadow(color: privacy.tint.opacity(0.7), radius: 3)
+        let tint = !privacy.isCameraInUse && audio.isMicMuted ? Palette.red : privacy.tint
+        Circle().fill(tint).frame(width: 7, height: 7)
+            .shadow(color: tint.opacity(0.7), radius: 3)
     }
 }

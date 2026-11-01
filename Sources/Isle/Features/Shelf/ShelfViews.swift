@@ -13,6 +13,8 @@ struct ShelfTab: View {
                 items
             }
         }
+        // the open island sizes itself to its content; the shelf needs room to drop onto
+        .frame(height: 112)
         .onAppear { shelf.pruneMissing() }
     }
 

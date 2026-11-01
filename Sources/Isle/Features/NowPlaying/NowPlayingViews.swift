@@ -39,39 +39,44 @@ struct NowPlayingBubble: View {
 
 // MARK: Expanded
 
+/// Artwork with its colour glowing beneath it; title, artist and position
+/// beside it; transport controls below.
 struct NowPlayingCard: View {
     @Environment(NowPlayingModel.self) private var player
+    @Environment(\.ambience) private var ambience
     @Environment(\.isSnapshot) private var isSnapshot
 
     var body: some View {
         if let track = player.track {
             VStack(spacing: 0) {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 14) {
                     artwork(for: track)
-                    VStack(alignment: .leading, spacing: 1) {
-                        MarqueeText(text: track.title.isEmpty ? "Not Playing" : track.title,
-                                    font: .island(14.5, .semibold))
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(alignment: .center, spacing: 8) {
+                            MarqueeText(text: track.title.isEmpty ? "Not Playing" : track.title,
+                                        font: .island(16, .semibold))
+                            Waveform(color: ambience.accent, isPlaying: player.isPlaying, bars: 4, height: 13,
+                                     barWidth: 2.4)
+                        }
                         Text(track.artist.isEmpty ? track.album : track.artist)
-                            .font(.island(13))
-                            .foregroundStyle(Palette.secondaryLabel)
+                            .font(.island(13, .medium))
+                            .foregroundStyle(ambience.tint.opacity(0.72))
                             .lineLimit(1)
+                            .padding(.top, 1)
+                        Spacer(minLength: 0)
+                        if track.duration > 0 {
+                            Scrubber(duration: track.duration)
+                        }
                     }
-                    Spacer(minLength: 8)
-                    Waveform(color: player.accent, isPlaying: player.isPlaying, bars: 5, height: 18, barWidth: 2.8)
-                        .padding(.trailing, 2)
+                    .frame(height: 68)
                 }
-                Spacer(minLength: 8)
-                if track.duration > 0 {
-                    Scrubber(duration: track.duration)
-                }
-                Spacer(minLength: 4)
-                HStack(spacing: 30) {
-                    IslandButton(symbol: "backward.fill", label: "Previous", size: 17, diameter: 36) { player.previous() }
-                    IslandButton(symbol: player.isPlaying ? "pause.fill" : "play.fill",
-                                 label: player.isPlaying ? "Pause" : "Play", size: 24, diameter: 42) {
-                        player.togglePlayPause()
-                    }
-                    IslandButton(symbol: "forward.fill", label: "Next", size: 17, diameter: 36) { player.next() }
+                Spacer(minLength: 6)
+                HStack(spacing: 34) {
+                    IslandButton(symbol: "backward.fill", label: "Previous", size: 17, tint: ambience.tint,
+                                 diameter: 38) { player.previous() }
+                    PlayButton()
+                    IslandButton(symbol: "forward.fill", label: "Next", size: 17, tint: ambience.tint,
+                                 diameter: 38) { player.next() }
                 }
             }
         } else {
@@ -81,16 +86,15 @@ struct NowPlayingCard: View {
 
     private func artwork(for track: NowPlayingModel.Track) -> some View {
         Button { player.openPlayer() } label: {
-            ArtworkView(image: player.artwork, size: 52, cornerRadius: 12)
-                .shadow(color: player.accent.opacity(player.artwork == nil ? 0 : 0.3), radius: 10, y: 2)
+            ArtworkView(image: player.artwork, size: 68, cornerRadius: 15)
                 .overlay(alignment: .bottomTrailing) {
                     if !isSnapshot, let icon = NSWorkspace.shared.appIcon(bundleID: track.bundleID) {
-                        Image(nsImage: icon).resizable().frame(width: 19, height: 19)
+                        Image(nsImage: icon).resizable().frame(width: 20, height: 20)
                             .shadow(color: .black.opacity(0.45), radius: 1.5, y: 0.5)
                             .offset(x: 5, y: 5)
                     }
                 }
-                .scaleEffect(player.isPlaying ? 1 : 0.93)
+                .scaleEffect(player.isPlaying ? 1 : 0.92)
                 .animation(Motion.morph, value: player.isPlaying)
         }
         .buttonStyle(PressableStyle())
@@ -98,19 +102,44 @@ struct NowPlayingCard: View {
     }
 }
 
+/// The focal control: a pale disc in the scene's tint, glyph in its deep colour.
+private struct PlayButton: View {
+    @Environment(NowPlayingModel.self) private var player
+    @Environment(\.ambience) private var ambience
+    @State private var isHovering = false
+
+    var body: some View {
+        Button { player.togglePlayPause() } label: {
+            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(.black)
+                .contentTransition(.symbolEffect(.replace.offUp))
+                .offset(x: player.isPlaying ? 0 : 1.5)
+                .frame(width: 46, height: 46)
+                .background(Circle().fill(Color.white).brightness(isHovering ? -0.06 : 0))
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressableStyle())
+        .onHover { isHovering = $0 }
+        .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
+    }
+}
+
 private struct NothingPlaying: View {
+    @Environment(\.ambience) private var ambience
+
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.secondaryFill)
-                Image(systemName: "music.note").font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Palette.tertiaryLabel)
+                RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Palette.secondaryFill)
+                Image(systemName: "music.note").font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(ambience.tint.opacity(0.5))
             }
-            .frame(width: 52, height: 52)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Not Playing").font(.island(14.5, .semibold)).foregroundStyle(Palette.secondaryLabel)
-                Text("Music, podcasts and videos appear here.")
-                    .font(.island(12)).foregroundStyle(Palette.tertiaryLabel)
+            .frame(width: 68, height: 68)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Nothing playing").font(.island(16, .semibold))
+                Text("Music, podcasts and videos show up here.")
+                    .font(.island(12.5)).foregroundStyle(ambience.tint.opacity(0.55))
             }
             Spacer(minLength: 0)
         }
@@ -121,6 +150,7 @@ private struct NothingPlaying: View {
 /// Elapsed / progress / remaining, draggable to seek.
 private struct Scrubber: View {
     @Environment(NowPlayingModel.self) private var player
+    @Environment(\.ambience) private var ambience
     let duration: Double
     @State private var scrubbing: Double?
     @State private var isHovering = false
@@ -128,15 +158,14 @@ private struct Scrubber: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let elapsed = scrubbing ?? player.elapsed(at: context.date)
-            HStack(spacing: 10) {
-                Text(Clock.string(elapsed)).frame(width: 38, alignment: .leading)
+            VStack(spacing: 4) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Palette.fill)
-                        Capsule().fill(Color.white.opacity(scrubbing == nil ? 0.88 : 1))
+                        Capsule().fill(ambience.tint.opacity(0.16))
+                        Capsule().fill(ambience.tint.opacity(scrubbing == nil ? 0.9 : 1))
                             .frame(width: geo.size.width * CGFloat(min(elapsed / duration, 1)))
                     }
-                    .frame(height: isHovering || scrubbing != nil ? 7 : 4.5)
+                    .frame(height: isHovering || scrubbing != nil ? 6 : 4)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
                     .gesture(DragGesture(minimumDistance: 0)
@@ -146,11 +175,15 @@ private struct Scrubber: View {
                             scrubbing = nil
                         })
                 }
-                .frame(height: 14)
-                Text("-" + Clock.string(max(0, duration - elapsed))).frame(width: 42, alignment: .trailing)
+                .frame(height: 10)
+                HStack {
+                    Text(Clock.string(elapsed))
+                    Spacer()
+                    Text("-" + Clock.string(max(0, duration - elapsed)))
+                }
+                .font(.islandNumber(10, .medium))
+                .foregroundStyle(ambience.tint.opacity(0.5))
             }
-            .font(.islandNumber(10.5, .medium))
-            .foregroundStyle(Palette.secondaryLabel)
         }
         .onHover { isHovering = $0 }
         .animation(Motion.snappy, value: isHovering)

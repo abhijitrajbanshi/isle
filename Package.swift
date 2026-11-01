@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "Isle", targets: ["Isle"]),
+        .executable(name: "isle-cli", targets: ["IsleCLI"]),
     ],
     dependencies: [
         // Auto-updates: EdDSA-signed appcast, the standard macOS updater.
@@ -30,6 +31,10 @@ let package = Package(
                 .linkedFramework("QuickLookThumbnailing"),
             ]
         ),
+
+        // `isle`: the command-line side of the activity API, bundled in the
+        // app. Claude Code hooks and scripts use it to report to the island.
+        .executableTarget(name: "IsleCLI"),
 
         .testTarget(name: "IsleKitTests", dependencies: ["IsleKit"]),
         .testTarget(name: "IsleTests", dependencies: ["Isle", "IsleKit"]),

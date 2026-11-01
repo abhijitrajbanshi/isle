@@ -1,9 +1,10 @@
-# Isle — Dynamic Island for the MacBook notch
+# Isle — the notch that does your waiting for you
 
-The goal: everything the iPhone Dynamic Island does, translated to the Mac,
-with the same motion language. Where iOS relies on something a Mac doesn't
-have (Face ID, the silent switch, phone calls) the closest Mac equivalent is
-used instead.
+Isle is designed for the Mac's notch, not copied from the iPhone. The island
+grows straight down out of the bezel; its body is always opaque black and
+only content takes colour (one thing at a time); it's as tall as what's in
+it; motion is critically damped and interruptible; and with nothing to say it
+is simply the notch.
 
 ## 1. Presentations (the island's "shapes")
 
@@ -12,7 +13,7 @@ used instead.
 | **Resting** — pill around the camera | **Idle** — black shape exactly over the notch, invisible | Grows a few points on hover, like a touch-down on iPhone |
 | **Compact** — leading + trailing content around the camera | **Compact** — content to the left and right of the notch | Width adapts to content |
 | **Minimal** — two activities: one attached, one detached bubble | **Split** — primary activity on the notch, second as a floating circle beside it | e.g. Timer + Music |
-| **Expanded** — long-press to open the full activity | **Expanded** — hover (or click) to open | Tabs: Home, Timer, Shelf |
+| **Expanded** — long-press to open the full activity | **Open** — hover (or click) to open | A stack: the most urgent activity at full size, everything else running as rows beneath; click a row to bring it up. Sized to its content |
 | **System alerts** — wide pill / banner | **HUD**, **Wide** and **Banner** alerts | Auto-dismiss; same-kind alerts update in place |
 
 All shape changes are one continuous spring morph: the black body, its
@@ -21,14 +22,20 @@ and content cross-fades with a blur, as on iOS.
 
 ## 2. Live Activities (persistent)
 
+| Activity | Compact | Open |
+|---|---|---|
+| **Claude Code** | project · "4m" working, amber **Allow?** when it needs you, green "Your turn" | what it's doing; a permission request takes over with the exact command or file, **Allow** / **Deny** / Answer in Claude. "Done" banner when it stops |
+| **Tasks** (`isle run`, `isle progress`) | progress ring · percentage | title, detail, progress bar; ✓ or ✗ banner with the time it took |
+
+
 | Activity | Compact | Bubble | Expanded |
 |---|---|---|---|
 | **Now Playing** (any app: Music, Spotify, browsers, Podcasts…) | album art · live waveform tinted with the artwork's colour | spinning art | art, title, artist, waveform, scrubber you can drag, previous / play-pause / next, tap the art to open the source app |
 | **Timer** | orange timer glyph · countdown | progress ring | presets, ring, pause / resume / cancel / +1 min |
-| **Upcoming event** (Calendar) | calendar colour + "in 4m" | calendar glyph | day, date and next events |
-| **Camera / microphone in use** | green camera / orange mic + dot | — | — |
+| **Upcoming event** (Calendar) | calendar colour + "in 4m"; a **Join** button for calls about to start | calendar glyph | the next call with **Join** and mic mute, or the rest of today |
+| **Camera / microphone in use** | green camera / orange mic + dot; red mic-slash when you're muted | — | — |
 
-Priority when several are live: Timer › Now Playing › Event › Privacy.
+Priority when several are live: Agent › Timer › Now Playing › Task › Event › Privacy.
 
 ## 3. System alerts (transient)
 
@@ -40,13 +47,22 @@ Priority when several are live: Timer › Now Playing › Event › Privacy.
 | AirPods connected (with battery) | Any Bluetooth device: AirPods / Beats / keyboard / mouse icon, name, battery ring when the device reports it |
 | Timer finished | Banner with Repeat / Stop, plays a sound |
 | — | Caps Lock on / off |
-| — | Event starting in 5 minutes |
+| — | Event starting in 5 minutes, with **Join** for Zoom, Meet, Teams, Webex, FaceTime, Slack and Whereby calls |
 
 Volume and brightness are left to macOS's own on-screen indicators, so
 nothing shows twice.
 
 ## 4. Mac-only additions
 
+* **Meetings** — finds the call link in an event's URL, location or notes;
+  Join from the notch, the five-minute banner or the expanded island.
+* **Microphone mute** — one click mutes the Mac's microphone for every app
+  (Zoom, Teams, the browser), with the state shown in the notch.
+* **Sound output** — switch between AirPods, speakers and displays from the
+  island instead of Control Centre.
+* **Keep awake** — stop the Mac and display sleeping for 30 minutes, 1 or 2
+  hours, or until turned off (like `caffeinate`), from the right-click menu.
+* **Timer** presets from the right-click menu.
 * **Auto-updates** — checks GitHub once a day and installs signed updates (Sparkle); “Check for Updates…” in the menu bar and Settings.
 
 * **File Shelf** — drag a file onto the notch and the island opens a shelf.

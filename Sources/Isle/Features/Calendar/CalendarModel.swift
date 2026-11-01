@@ -13,6 +13,9 @@ final class CalendarModel {
         let start: Date
         let end: Date
         let color: IslandColor
+        var meeting: MeetingLink? = nil
+
+        var isUnderway: Bool { start <= .now && end > .now }
     }
 
     private(set) var upcoming: [Event] = []
@@ -93,6 +96,16 @@ final class CalendarModel {
         }
     }
 
+    /// The next event with a call link that's about to start or underway.
+    func nextMeeting() -> Event? {
+        let now = Date.now
+        return upcoming.first { $0.meeting != nil && $0.start.timeIntervalSince(now) < 15 * 60 && $0.end > now }
+    }
+
+    func join(_ meeting: MeetingLink) {
+        NSWorkspace.shared.open(meeting.url)
+    }
+
     func openCalendar() {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
     }
@@ -113,7 +126,8 @@ final class CalendarModel {
             .prefix(6)
             .map { Event(id: "\($0.calendarItemIdentifier)@\($0.startDate.timeIntervalSince1970)",
                          title: $0.title ?? "Event", start: $0.startDate, end: $0.endDate,
-                         color: IslandColor($0.calendar?.color)) }
+                         color: IslandColor($0.calendar?.color),
+                         meeting: MeetingLink.find(in: [$0.url?.absoluteString, $0.location, $0.notes])) }
         if upcoming != events { upcoming = Array(events) }
 
         // only events still ahead can be alerted again; forget the rest
@@ -122,7 +136,8 @@ final class CalendarModel {
             let lead = event.start.timeIntervalSince(now)
             guard lead > 0, lead <= 5 * 60 + 30 else { continue }
             alerted.insert(event.id)
-            post(.eventSoon(EventInfo(title: event.title, start: event.start, color: event.color)))
+            post(.eventSoon(EventInfo(title: event.title, start: event.start, color: event.color,
+                                      meeting: event.meeting)))
         }
     }
 

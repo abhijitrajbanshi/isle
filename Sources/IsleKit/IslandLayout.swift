@@ -4,8 +4,17 @@ import CoreGraphics
 /// right on any MacBook (and on displays without a notch).
 public struct IslandLayout: Equatable, Sendable {
     public var metrics: NotchMetrics
+    /// The open island is as tall as its content (measured by the view),
+    /// notch row included.
+    public var expandedHeight: CGFloat
 
-    public init(metrics: NotchMetrics) { self.metrics = metrics }
+    public init(metrics: NotchMetrics, expandedHeight: CGFloat = 200) {
+        self.metrics = metrics
+        self.expandedHeight = expandedHeight
+    }
+
+    /// Width of the open island.
+    public var expandedWidth: CGFloat { max(notchWidth + 375, 560) }
 
     public static let bubbleGap: CGFloat = 6
 
@@ -42,7 +51,8 @@ public struct IslandLayout: Equatable, Sendable {
             }
 
         case .expanded:
-            return IslandShape(width: max(notchWidth + 400, 600), height: notchHeight + 152, shoulder: 14, radius: 38)
+            return IslandShape(width: expandedWidth, height: max(expandedHeight, notchHeight + 60),
+                               shoulder: 12, radius: 30)
         }
     }
 
@@ -53,6 +63,8 @@ public struct IslandLayout: Equatable, Sendable {
         case .timer: 70
         case .calendar: 72
         case .privacy: notchHeight + 2
+        case .task: 64
+        case .agent: 84
         }
     }
 

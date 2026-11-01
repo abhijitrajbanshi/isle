@@ -143,11 +143,29 @@ private struct AlertBanner: View {
                 Titles(title: event.title,
                        subtitle: "\(AlertCopy.startsIn(event.start)) · \(event.start.formatted(date: .omitted, time: .shortened))")
                 Spacer(minLength: 8)
-                Image(systemName: "calendar").font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(event.color.color)
+                if let meeting = event.meeting {
+                    ActionPill(symbol: "video.fill", title: "Join", color: event.color.color, height: 32) {
+                        calendar.join(meeting)
+                        engine.dismissAlert()
+                    }
+                } else {
+                    Image(systemName: "calendar").font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(event.color.color)
+                }
             }
             .contentShape(Rectangle())
             .onTapGesture { calendar.openCalendar() }
+        case .finished(let info):
+            HStack(spacing: 13) {
+                Image(systemName: info.succeeded ? "checkmark" : "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(info.succeeded ? Palette.green : Palette.red))
+                    .symbolEffect(.bounce, value: info)
+                Titles(title: info.title, subtitle: info.detail)
+                Spacer(minLength: 8)
+            }
         default:
             EmptyView()
         }

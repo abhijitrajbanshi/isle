@@ -17,14 +17,12 @@ enum DemoReel {
         preferences.style = style
         let c = IsleContainer(preferences: preferences, metrics: .preview, defaults: defaults)
         c.power.preview(level: 82, charging: false)
-        let event = CalendarModel.Event(id: "1", title: "Design review", start: Date.now.addingTimeInterval(7200),
-                                        end: Date.now.addingTimeInterval(10_800),
-                                        color: IslandColor(red: 0.35, green: 0.5, blue: 1))
-        c.calendar.preview([event])
+        c.calendar.preview([])
+        c.audio.preview(outputs: SnapshotRenderer.sampleOutputs, current: 0, micMuted: false)
 
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
-        let size = CGSize(width: 820, height: 230)
+        let size = CGSize(width: 820, height: 280)
         guard let screen = NSScreen.main else { exit(1) }
         // somewhere the pointer isn't, since the recording includes it
         let visible = screen.visibleFrame
@@ -56,28 +54,49 @@ enum DemoReel {
 
     private static func play(_ c: IsleContainer) async {
         func wait(_ seconds: Double) async { try? await Task.sleep(for: .seconds(seconds)) }
-        let engine = c.engine
+        let engine = c.engine, hub = c.hub
+        func claude(_ event: String, tool: String? = nil, _ input: [String: Any] = [:]) -> ActivityHub.PermissionRequest? {
+            var payload: [String: Any] = ["session_id": "demo", "cwd": "/Users/you/code/isle"]
+            if let tool { payload["tool_name"] = tool; payload["tool_input"] = input }
+            return hub.claude(event: event, payload: payload)
+        }
 
         await wait(1.2)
-        engine.pointerMoved(inside: true); await wait(1.1)
-        engine.pointerMoved(inside: false); await wait(0.9)
-
         c.nowPlaying.preview(title: "Midnight City", artist: "M83", playing: true,
                              artwork: SnapshotRenderer.artwork, accent: SnapshotRenderer.accent)
-        await wait(3)
-        engine.expand(tab: .home); await wait(3.4)
-        engine.collapse(); await wait(1.4)
+        await wait(2.6)
 
-        c.timer.start(5 * 60); await wait(2.6)
-        engine.present(.device(DeviceInfo(name: "AirPods Pro", symbol: "airpodspro", battery: 86, isConnected: true)))
-        await wait(4.6)
-        engine.present(.power(level: 82, isCharging: true)); await wait(3)
-        engine.present(.capsLock(isOn: true)); await wait(2)
+        // an agent starts, edits, then needs you: the island opens by itself
+        _ = claude("UserPromptSubmit")
+        await wait(1.8)
+        _ = claude("PreToolUse", tool: "Edit", ["file_path": "/Users/you/code/isle/IslandView.swift"])
+        await wait(1.6)
+        let request = claude("PermissionRequest", tool: "Bash", ["command": "swift test --parallel"])
+        await wait(3.4)
+        if let request { hub.decide(request, .allow) }
+        await wait(1.6)
+        _ = claude("Stop")
+        await wait(4.8)
 
-        engine.expand(tab: .timer); await wait(2.8)
+        // a build posted with `isle run`
+        for progress in [0.18, 0.46, 0.74, 0.97] {
+            hub.task(id: "build", title: "Archive Isle", detail: "Compiling", progress: progress)
+            await wait(0.8)
+        }
+        hub.taskFinished(id: "build", succeeded: true, detail: nil)
+        await wait(5.4)
+
+        // open: the player, at the height its content needs
+        engine.expand(tab: .home); await wait(3.2)
         engine.collapse(); await wait(1.2)
-        c.timer.cancel(); await wait(1.2)
-        c.nowPlaying.clear(); await wait(1.6)
+
+        // a call about to start: Join from the notch
+        c.nowPlaying.clear()
+        await wait(0.6)
+        c.calendar.preview([SnapshotRenderer.standup(startingIn: 90)])
+        await wait(3.4)
+        c.calendar.preview([])
+        await wait(1.4)
     }
 
     /// A wallpaper and menu bar under the island, with the hardware notch on top.

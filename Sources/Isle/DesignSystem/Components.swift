@@ -374,3 +374,112 @@ extension NSWorkspace {
         return icon(forFile: url.path)
     }
 }
+
+// MARK: - Chip
+
+/// A small capsule control resting on the island body: icon, optional
+/// label and disclosure chevron. Active chips take the scene's accent
+/// (or their own colour, e.g. red for a muted mic).
+struct Chip: View {
+    let symbol: String
+    var title: String? = nil
+    var isActive = false
+    var activeColor: Color? = nil
+    var disclosure = false
+    var label: String? = nil
+    let action: () -> Void
+    @Environment(\.ambience) private var ambience
+    @State private var isHovering = false
+
+    var body: some View {
+        let colour = activeColor ?? ambience.accent
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                if let title {
+                    Text(title).font(.island(11.5, .medium)).lineLimit(1)
+                        .contentTransition(.numericText())
+                }
+                if disclosure {
+                    Image(systemName: "chevron.down").font(.system(size: 7.5, weight: .bold)).opacity(0.55)
+                        .rotationEffect(.degrees(isActive ? 180 : 0))
+                }
+            }
+            .foregroundStyle(isActive ? colour : ambience.tint.opacity(0.88))
+            .padding(.horizontal, title == nil ? 0 : 10)
+            .frame(minWidth: 26, minHeight: 26)
+            .background(Capsule().fill(isActive ? colour.opacity(0.2)
+                                                : Color.white.opacity(isHovering ? 0.12 : 0.07)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.07), lineWidth: 0.5))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .onHover { isHovering = $0 }
+        .animation(Motion.snappy, value: isHovering)
+        .animation(Motion.snappy, value: isActive)
+        .accessibilityLabel(label ?? title ?? "")
+        .help(label ?? title ?? "")
+    }
+}
+
+/// A row in an island list (output devices, durations): hover highlight,
+/// trailing checkmark when selected.
+struct ListRow: View {
+    let symbol: String
+    let title: String
+    var isSelected = false
+    let action: () -> Void
+    @Environment(\.ambience) private var ambience
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol).font(.system(size: 13, weight: .medium))
+                    .frame(width: 20)
+                    .foregroundStyle(isSelected ? ambience.accent : ambience.tint.opacity(0.75))
+                Text(title).font(.island(13, isSelected ? .semibold : .regular)).lineLimit(1)
+                Spacer(minLength: 6)
+                if isSelected {
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(ambience.accent)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color.white.opacity(isHovering ? 0.08 : 0)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .onHover { isHovering = $0 }
+        .animation(Motion.snappy, value: isHovering)
+    }
+}
+
+/// Primary call to action on the island (Join): a filled capsule.
+struct ActionPill: View {
+    let symbol: String
+    let title: String
+    var color: Color
+    var height: CGFloat = 28
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: height * 0.38, weight: .bold))
+                Text(title).font(.island(height * 0.45, .semibold))
+            }
+            .foregroundStyle(.black.opacity(0.85))
+            .padding(.horizontal, height * 0.45)
+            .frame(height: height)
+            .background(Capsule().fill(color))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(title)
+    }
+}

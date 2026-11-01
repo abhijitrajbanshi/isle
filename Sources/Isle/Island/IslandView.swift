@@ -11,6 +11,9 @@ struct IslandView: View {
     @Environment(ShelfModel.self) private var shelf
     @Environment(Preferences.self) private var preferences
     @Environment(PowerMonitor.self) private var power
+    @Environment(NowPlayingModel.self) private var player
+    @Environment(TimerModel.self) private var timer
+    @Environment(CalendarModel.self) private var calendar
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isSnapshot) private var isSnapshot
     @State private var isResting = false
@@ -28,6 +31,7 @@ struct IslandView: View {
         .animation(animation(for: presentation), value: presentation)
         .animation(reduceMotion ? Motion.reduced : Motion.morph, value: engine.isHovering)
         .animation(Motion.morph, value: engine.metrics)
+        .animation(reduceMotion ? Motion.reduced : Motion.morph, value: engine.expandedHeight)
         .task(id: presentation.isIdle) {
             // Once the shape has shrunk back into the notch, stop drawing it.
             isResting = false
@@ -36,6 +40,7 @@ struct IslandView: View {
             isResting = !Task.isCancelled
         }
         .environment(\.colorScheme, .dark)
+        .environment(\.ambience, ambience(for: presentation))
         .environment(\.prefersStillness, reduceMotion || power.isLowPowerMode)
     }
 
@@ -114,6 +119,28 @@ struct IslandView: View {
         }
     }
 
+    /// The content colour: the artwork's while music shows, a meeting's
+    /// calendar, the timer's orange, amber while an agent waits on you.
+    private func ambience(for presentation: Presentation) -> Ambience {
+        let music = player.track != nil && player.artwork != nil ? Ambience(player.accent) : nil
+        switch presentation {
+        case .compact(let primary, _):
+            switch primary {
+            case .nowPlaying: return music ?? .signature
+            case .timer: return Ambience(accent: Palette.orange)
+            case .calendar: return calendar.current().map { Ambience($0.color) } ?? .signature
+            case .agent: return Ambience(accent: Palette.amber)
+            case .task, .privacy: return .signature
+            }
+        case .alert(.eventSoon(let event)):
+            return Ambience(event.color)
+        case .expanded:
+            return music ?? .signature
+        default:
+            return .signature
+        }
+    }
+
     private func shadowOpacity(for presentation: Presentation) -> Double {
         switch presentation {
         case .expanded: 0.6
@@ -125,8 +152,25 @@ struct IslandView: View {
 
 private struct IslandContextMenu: View {
     @Environment(\.openIsleSettings) private var openSettings
+    @Environment(TimerModel.self) private var timer
+    @Environment(KeepAwakeModel.self) private var awake
 
     var body: some View {
+        Menu("Timer") {
+            ForEach(TimerModel.presets, id: \.self) { seconds in
+                Button(seconds >= 3600 ? "1 hour" : "\(Int(seconds / 60)) minutes") { timer.start(seconds) }
+            }
+        }
+        Menu("Keep Awake") {
+            ForEach(KeepAwakeModel.Duration.allCases) { duration in
+                Button(duration.title) { awake.start(duration) }
+            }
+            if awake.isOn {
+                Divider()
+                Button("Allow Sleep") { awake.stop() }
+            }
+        }
+        Divider()
         Button("Settings…") { openSettings() }
         Divider()
         Button("Quit Isle") { NSApp.terminate(nil) }
