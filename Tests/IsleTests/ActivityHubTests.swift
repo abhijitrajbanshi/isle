@@ -145,6 +145,30 @@ struct ActivityHubTests {
         hub.activated(42)
         hub.claude(event: "Stop", payload: event("Stop"))
         #expect(finished == 0)
+        // and it doesn't turn up as "ready" once you switch away
+        hub.activated(7)
+        #expect(hub.live.isEmpty)
+    }
+
+    @Test func lookingAtTheSessionClearsItsReview() {
+        let hub = hostedHub()
+        hub.activated(7)
+        hub.claude(event: "UserPromptSubmit", payload: event("UserPromptSubmit"), ancestors: [42])
+        hub.claude(event: "Stop", payload: event("Stop"))
+        #expect(hub.live.first?.state == .review)
+        hub.activated(42)   // you opened Claude
+        hub.activated(7)
+        #expect(hub.live.isEmpty)
+    }
+
+    @Test func goToSessionClearsItsReview() {
+        let hub = hostedHub()
+        hub.activated(7)
+        hub.claude(event: "UserPromptSubmit", payload: event("UserPromptSubmit"), ancestors: [42])
+        hub.claude(event: "Stop", payload: event("Stop"))
+        let activity = hub.live[0]
+        hub.focus(activity)
+        #expect(hub.live.isEmpty)
     }
 
     // MARK: Questions, plans, always allow

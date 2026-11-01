@@ -171,6 +171,8 @@ final class ActivityHub {
         for activity in activities where activity.request != nil && isInFront(activity) {
             if let request = activity.request { withdraw(request.id) }
         }
+        // and a finished session you've now looked at is no longer waiting for review
+        activities.removeAll { $0.state == .review && isInFront($0) }
     }
 
     func isInFront(_ activity: Activity) -> Bool {
@@ -237,8 +239,9 @@ final class ActivityHub {
         activities.removeAll { $0.id == id && $0.state == .review }
     }
 
-    /// Brings the session's app to the front.
+    /// Brings the session's app to the front; that counts as having seen it.
     func focus(_ activity: Activity) {
+        if activity.state == .review { dismissReview(activity.id) }
         guard let host = activity.host else { return }
         NSRunningApplication(processIdentifier: host)?.activate()
     }
@@ -322,6 +325,11 @@ final class ActivityHub {
     /// A session stopped: keep it as "ready for review" with what it changed.
     private func finish(_ index: Int, summary: String?) {
         let activity = activities[index]
+        // you watched it finish in its own app: nothing left to review here
+        if isInFront(activity) {
+            activities.remove(at: index)
+            return
+        }
         let minutes = Int(Date.now.timeIntervalSince(activity.started) / 60)
         let line = Self.plain((summary ?? "").split(separator: "\n").first.map(String.init) ?? "")
         activities[index].state = .review
@@ -341,8 +349,6 @@ final class ActivityHub {
             activities[i].review?.pullRequest = changes.pullRequest
             activities[i].review?.loaded = true
         }
-        // you watched it finish
-        guard !isInFront(activity) else { return }
         var detail = minutes >= 1 ? "Claude worked for \(minutes) min" : "Claude finished"
         if let test = activity.lastTest { detail += test.passed ? " · tests passed" : " · tests failed" }
         onFinish(FinishedInfo(title: "\(activity.title) is ready", detail: detail, symbol: "checkmark",
