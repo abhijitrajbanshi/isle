@@ -231,4 +231,11 @@ struct ActivityHubTests {
         #expect(review?.pullRequest?.lastPathComponent == "7")
         #expect(hub.live.first?.lastTest?.passed == true)
     }
+
+    @Test func describesCommandsByTheirProgram() {
+        #expect(ActivityHub.program("swift test --parallel") == "swift test")
+        #expect(ActivityHub.program("S=/private/tmp/x; cd /code/isle && npm run build") == "npm run")
+        #expect(ActivityHub.program("FOO=1 /usr/bin/make -j8") == "make")
+        #expect(ActivityHub.program("cd /tmp") == "a command")
+    }
 }

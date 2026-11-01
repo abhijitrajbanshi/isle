@@ -619,7 +619,7 @@ final class ActivityHub {
         switch tool {
         case "Edit", "MultiEdit", "Write", "NotebookEdit": return "Editing \(name)"
         case "Read": return "Reading \(name)"
-        case "Bash": return "Running \(subject.split(separator: " ").prefix(2).joined(separator: " "))"
+        case "Bash": return "Running \(program(subject))"
         case "Grep", "Glob": return "Searching"
         case "WebFetch", "WebSearch": return "Browsing"
         case "Task", "Agent": return "Delegating"
@@ -627,6 +627,22 @@ final class ActivityHub {
         case "AskUserQuestion": return "Asking you"
         default: return tool.isEmpty ? "Working" : tool
         }
+    }
+
+    /// The program a command line runs, skipping `cd dir &&`, variable
+    /// assignments and paths: "swift test", not "S=/tmp/x; cd ~/code && …".
+    static func program(_ command: String) -> String {
+        let segments = command.components(separatedBy: CharacterSet(charactersIn: ";&|\n"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("cd ") && $0 != "cd" }
+        for segment in segments {
+            let words = segment.split(separator: " ").map(String.init).drop { $0.contains("=") || $0 == "sudo" }
+            guard let first = words.first else { continue }
+            let name = (first as NSString).lastPathComponent
+            let second = words.dropFirst().first.map { $0.hasPrefix("-") || $0.contains("/") ? "" : " " + $0 } ?? ""
+            return name + second
+        }
+        return "a command"
     }
 
     /// Test runners worth reporting on.
