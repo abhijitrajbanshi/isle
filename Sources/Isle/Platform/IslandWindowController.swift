@@ -45,6 +45,7 @@ final class IslandWindowController {
         sensor.onEnter = { [weak self] in self?.pointerArrived() }
         sensor.onFileDrag = { [weak self] in self?.fileDragArrived() }
         root.onExit = { [weak self] in self?.pointerLeft() }
+        root.onMove = { [weak self] speed in self?.engine.pointerMotion(speed: speed) }
 
         place()
         observeSystem()

@@ -66,6 +66,9 @@ private final class SensorView: NSView {
 /// watches for the pointer leaving the island's hit area.
 final class IslandRootContainer: NSView {
     var onExit: () -> Void = {}
+    /// Pointer speed over the island, in points per second.
+    var onMove: (Double) -> Void = { _ in }
+    private var lastMoveTime: TimeInterval?
 
     /// Hit area in this view's coordinates.
     var trackingRect: CGRect = .zero {
@@ -79,7 +82,8 @@ final class IslandRootContainer: NSView {
 
     private func rebuildTrackingArea() {
         if let area { removeTrackingArea(area) }
-        var options: NSTrackingArea.Options = [.mouseEnteredAndExited, .activeAlways]
+        // moves are reported only inside the island, so this costs nothing elsewhere
+        var options: NSTrackingArea.Options = [.mouseEnteredAndExited, .mouseMoved, .activeAlways]
         // if the pointer is already inside, the next event must be the exit
         if let window, trackingRect.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {
             options.insert(.assumeInside)
@@ -89,5 +93,17 @@ final class IslandRootContainer: NSView {
         self.area = area
     }
 
-    override func mouseExited(with event: NSEvent) { onExit() }
+    override func mouseExited(with event: NSEvent) {
+        lastMoveTime = nil
+        onExit()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        // raw deltas, not positions: pushing against the top of the screen
+        // still counts as moving, and the first event inside has a speed too
+        let elapsed = lastMoveTime.map { event.timestamp - $0 } ?? 1.0 / 60
+        lastMoveTime = event.timestamp
+        guard elapsed > 0.001 else { return }
+        onMove(hypot(event.deltaX, event.deltaY) / min(elapsed, 0.1))
+    }
 }

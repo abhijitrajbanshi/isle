@@ -42,6 +42,20 @@ isle progress upload 0.42 --title "Uploading" --detail "photos.zip"
 isle done upload
 ```
 
+## Light by design
+
+Isle does nothing until something happens: no polling, no global mouse
+monitor, no timers ticking at rest. Measured with `top` over a minute on an
+M5 MacBook with macOS 27.2, music showing in the notch:
+
+| | Isle |
+|---|---|
+| CPU | 0.1 % average |
+| Wakeups | under 1 per second |
+| Memory | about 35 MB |
+
+Measure it yourself: `top -pid $(pgrep -x Isle) -stats cpu,idlew,power,mem`.
+
 ## Build & run
 
 ```bash

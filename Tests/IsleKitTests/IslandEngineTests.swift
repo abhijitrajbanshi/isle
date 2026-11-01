@@ -10,6 +10,11 @@ private let longWaitsBlock: IslandEngine.Sleep = { duration in
     if duration < .seconds(1) { await Task.yield() } else { try await Task.sleep(for: .seconds(60)) }
 }
 
+private actor Waits {
+    private(set) var last: Duration?
+    func record(_ duration: Duration) { last = duration }
+}
+
 /// Lets queued main-actor tasks run.
 @MainActor
 private func settle() async {
@@ -206,6 +211,28 @@ struct PointerTests {
         engine.pointerMoved(inside: false)
         await settle()
         #expect(!engine.isExpanded)
+    }
+
+    @Test func fastMotionWaitsForThePointerToSettle() async {
+        let waits = Waits()
+        // the normal hover delay passes; the longer settle wait never does
+        let engine = IslandEngine(sleep: { duration in
+            await waits.record(duration)
+            if duration >= .milliseconds(300) { try await Task.sleep(for: .seconds(60)) } else { await Task.yield() }
+        })
+        engine.pointerMoved(inside: true)
+        engine.pointerMotion(speed: 900)   // sweeping or overshooting
+        await settle()
+        #expect(!engine.isExpanded)
+        #expect(await waits.last == engine.timing.settleDelay)
+    }
+
+    @Test func slowMotionDoesNotDelayOpening() async {
+        let engine = IslandEngine(sleep: instant)
+        engine.pointerMoved(inside: true)
+        engine.pointerMotion(speed: 40)    // fine adjustment
+        await settle()
+        #expect(engine.isExpanded)
     }
 
     @Test func hoverDisabledRequiresClick() async {

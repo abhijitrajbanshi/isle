@@ -27,11 +27,14 @@ struct IslandSurface<S: Shape>: View {
     /// activities beside the notch); it fades back in when the island grows.
     var bare = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         // Reduce Transparency replaces glass with an opaque surface, as system glass does
         if style == .black || reduceTransparency {
             shape.fill(.black)
+                // Increase Contrast: an outline keeps the island distinct on a dark menu bar
+                .overlay { if contrast == .increased { shape.stroke(.white.opacity(0.5), lineWidth: 1) } }
         } else {
             glass.opacity(bare ? 0 : 1)
         }

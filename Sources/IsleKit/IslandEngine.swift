@@ -18,6 +18,11 @@ public final class IslandEngine {
         public var queueGap: Duration = .milliseconds(220)
         /// Longest an alert can be held open by hovering it.
         public var maxAlertHold: Duration = .seconds(8)
+        /// After fast motion over the notch, how long the pointer must rest
+        /// before hovering opens the island.
+        public var settleDelay: Duration = .milliseconds(320)
+        /// Pointer speed (points per second) that counts as passing through.
+        public var passingSpeed: Double = 240
         public init() {}
     }
 
@@ -230,9 +235,23 @@ public final class IslandEngine {
             return
         }
         guard !isExpanded, expandsOnHover, !isFullScreen else { return }
+        scheduleHoverExpansion(after: hoverDelay)
+    }
+
+    /// The pointer moving over the island, in points per second. Hovering
+    /// opens the island only once the pointer settles: sweeping along the top
+    /// of the screen, or overshooting into the notch on the way to the menu
+    /// bar, keeps restarting the wait instead of opening it.
+    public func pointerMotion(speed: Double) {
+        guard isHovering, hoverIsIntentional, !isExpanded, expandsOnHover, !isFullScreen, alert == nil,
+              speed > timing.passingSpeed else { return }
+        scheduleHoverExpansion(after: max(hoverDelay, timing.settleDelay))
+    }
+
+    private func scheduleHoverExpansion(after delay: Duration) {
         hoverTask?.cancel()
-        hoverTask = Task { [weak self, sleep, hoverDelay] in
-            try? await sleep(hoverDelay)
+        hoverTask = Task { [weak self, sleep] in
+            try? await sleep(delay)
             guard !Task.isCancelled, let self, self.isHovering else { return }
             self.expand()
         }
