@@ -7,7 +7,7 @@ import SwiftUI
 struct StackView: View {
     enum Hero: Hashable {
         case request(String), review(String), ci(String), pullRequest(String), call(String), music, agent(String),
-             timer, task(String), usage, summary, quiet
+             timer, task(String), usage, summary, servers, quiet
     }
     enum Panel { case output, awake }
 
@@ -19,6 +19,8 @@ struct StackView: View {
     @Environment(AudioModel.self) private var audio
     @Environment(ShelfModel.self) private var shelf
     @Environment(GitHubModel.self) private var github
+    @Environment(ServersModel.self) private var servers
+    @Environment(\.isSnapshot) private var isSnapshot
     @State private var pinned: Hero?
     @State private var panel: Panel?
 
@@ -28,7 +30,7 @@ struct StackView: View {
         let agents = hub.live.filter { $0.kind == .agent }
         list += agents.filter { $0.request != nil }.map { .request($0.id) }
         list += agents.filter { $0.request == nil && $0.state == .review }.map { .review($0.id) }
-        list += github.live.filter { $0.state == .failed }.map { .ci($0.id) }
+        list += github.live.filter { $0.state == .failed || $0.hasDeployNews }.map { .ci($0.id) }
         list += github.pullRequests.prefix(3).filter { $0.kind == .reviewRequested || $0.kind == .changesRequested }
             .map { .pullRequest($0.id) }
         if let meeting = calendar.nextMeeting() { list.append(.call(meeting.id)) }
@@ -36,10 +38,11 @@ struct StackView: View {
         list += agents.filter { $0.request == nil && $0.state != .review }.map { .agent($0.id) }
         if timer.isActive { list.append(.timer) }
         list += hub.live.filter { $0.kind == .task }.map { .task($0.id) }
-        list += github.live.filter { $0.state != .failed }.map { .ci($0.id) }
+        list += github.live.filter { $0.state != .failed && !$0.hasDeployNews }.map { .ci($0.id) }
         list += github.pullRequests.prefix(3).filter { $0.kind == .approved }.map { .pullRequest($0.id) }
         if shelf.summary != nil { list.append(.summary) }
         if hub.usage != nil, hub.isEnabled() { list.append(.usage) }
+        if !servers.servers.isEmpty { list.append(.servers) }
         return list
     }
 
@@ -80,6 +83,8 @@ struct StackView: View {
                 .padding(.top, 14)
             }
         }
+        // what's listening on localhost, read as the island opens
+        .task { if !isSnapshot { await servers.refresh() } }
         .animation(Motion.morph, value: hero)
         .animation(Motion.morph, value: rows)
         .animation(Motion.morph, value: panel)
@@ -132,6 +137,7 @@ struct StackView: View {
             "Claude Code · \(hub.live.first { $0.id == id }?.title ?? "")"
         case .usage: "Claude usage"
         case .ci: "GitHub Actions"
+        case .servers: "Localhost"
         case .pullRequest: "Pull request"
         case .call: "Up next"
         case .music: "Now playing"
@@ -197,6 +203,8 @@ struct StackView: View {
             if let usage = hub.usage { UsageCard(usage: usage) }
         case .ci(let id):
             if let run = github.live.first(where: { $0.id == id }) { CICard(run: run) }
+        case .servers:
+            ServersCard()
         case .pullRequest(let id):
             if let item = github.pullRequests.first(where: { $0.id == id }) { PullRequestCard(item: item) }
         case .timer:
@@ -222,6 +230,7 @@ private struct StackRow: View {
     @Environment(CalendarModel.self) private var calendar
     @Environment(ShelfModel.self) private var shelf
     @Environment(GitHubModel.self) private var github
+    @Environment(ServersModel.self) private var servers
     @State private var isHovering = false
 
     var body: some View {
@@ -266,6 +275,8 @@ private struct StackRow: View {
             }
         case .pullRequest:
             Image(systemName: "arrow.triangle.pull").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
+        case .servers:
+            Image(systemName: "server.rack").font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.secondaryLabel)
         case .call:
             Image(systemName: "video.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.green)
         case .timer:
@@ -299,6 +310,9 @@ private struct StackRow: View {
             if let item = github.pullRequests.first(where: { $0.id == id }) {
                 Text(item.title) + Text("  #\(item.number)").foregroundStyle(Palette.tertiaryLabel)
             }
+        case .servers:
+            Text("Localhost") + Text(verbatim: "  " + servers.servers.prefix(3).map { ":\($0.port)" }.joined(separator: " "))
+                .foregroundStyle(Palette.tertiaryLabel)
         case .call(let id):
             Text(calendar.upcoming.first { $0.id == id }?.title ?? "Meeting")
         case .timer:
@@ -331,6 +345,9 @@ private struct StackRow: View {
             if let item = github.pullRequests.first(where: { $0.id == id }) {
                 Text(PullRequestCopy.state(item.kind)).font(.island(12, .semibold)).foregroundStyle(PullRequestCopy.tint(item.kind))
             }
+        case .servers:
+            Text(servers.servers.count == 1 ? "1 server" : "\(servers.servers.count) servers")
+                .font(.island(12, .semibold)).foregroundStyle(Palette.secondaryLabel)
         case .usage:
             if let window = hub.usage?.fiveHour ?? hub.usage?.weekly {
                 Text("\(Int(window.used))% · resets \(window.resetsAt.formatted(date: .omitted, time: .shortened))")

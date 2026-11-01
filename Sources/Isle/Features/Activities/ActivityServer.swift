@@ -140,6 +140,13 @@ extension ActivityHub {
                 shellEnded(id: id, status: message["status"] as? Int ?? 0)
             }
             return Self.reply(["ok": true])
+        case "xcode":
+            switch message["op"] as? String {
+            case "started": xcodeStarted(ancestors: (message["ancestors"] as? [Int] ?? []).map { pid_t($0) })
+            case "succeeded": xcodeFinished(succeeded: true)
+            default: xcodeFinished(succeeded: false)
+            }
+            return Self.reply(["ok": true])
         case "status":
             status(message["payload"] as? [String: Any] ?? [:])
             return Self.reply(["ok": true])

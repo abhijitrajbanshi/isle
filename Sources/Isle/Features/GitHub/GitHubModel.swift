@@ -19,6 +19,18 @@ final class GitHubModel {
         let url: URL?
     }
 
+    /// A deployment of a pushed commit (preview or production).
+    struct Deploy: Equatable {
+        enum State: Equatable { case building, ready, failed }
+        let environment: String
+        let isProduction: Bool
+        var state: State
+        let url: URL?
+        let logs: URL?
+
+        var title: String { isProduction ? "Production" : environment.localizedCaseInsensitiveContains("preview") ? "Preview" : environment }
+    }
+
     /// One pushed commit's CI.
     struct Run: Identifiable, Equatable {
         enum State: Equatable { case waiting, running, passed, failed }
@@ -28,11 +40,14 @@ final class GitHubModel {
         let sha: String
         var state: State = .waiting
         var checks: [Check] = []
+        var deploys: [Deploy] = []
         let started: Date
         /// The app the push came from (a terminal, Claude), to step aside while it's in front.
         var host: pid_t?
 
         var failing: Check? { checks.first(where: \.failed) }
+        /// A deploy just became ready or failed: worth leading the open island.
+        var hasDeployNews: Bool { deploys.contains { $0.state != .building } }
         var progress: Double? { checks.isEmpty ? nil : Double(checks.filter(\.done).count) / Double(checks.count) }
     }
 
@@ -114,27 +129,55 @@ final class GitHubModel {
                 try? await Task.sleep(for: .seconds(15), tolerance: .seconds(3))
                 guard let self, let index = self.runs.firstIndex(where: { $0.id == id }), let token = self.token else { return }
                 let run = self.runs[index]
-                let response = await GitHubAPI.checkRuns(repo: run.repo, sha: run.sha, token: token, etag: etag)
-                guard let response else { continue }       // not pushed yet, or unchanged
-                etag = response.etag
-                if response.checks.isEmpty {
-                    if Date.now.timeIntervalSince(run.started) > 180 { self.runs.remove(at: index); return }
-                    continue
+                // deployments: reported once each, as they become ready or fail
+                let deploys = await GitHubAPI.deployments(repo: run.repo, sha: run.sha, token: token)
+                if let i = self.runs.firstIndex(where: { $0.id == id }), deploys != self.runs[i].deploys {
+                    let before = self.runs[i].deploys
+                    self.runs[i].deploys = deploys
+                    for deploy in deploys where deploy.state != .building
+                        && !before.contains(where: { $0.environment == deploy.environment && $0.state == deploy.state }) {
+                        self.deployed(deploy, run: self.runs[i])
+                    }
                 }
-                self.runs[index].checks = response.checks
-                let done = response.checks.allSatisfy(\.done)
-                self.runs[index].state = done ? (response.checks.contains(where: \.failed) ? .failed : .passed) : .running
-                if done {
-                    self.finished(self.runs[index])
+                let deploysSettled = deploys.allSatisfy { $0.state != .building }
+
+                if let response = await GitHubAPI.checkRuns(repo: run.repo, sha: run.sha, token: token, etag: etag) {
+                    etag = response.etag
+                    if response.checks.isEmpty, deploys.isEmpty {
+                        // no CI and nothing deploying: stop looking after a few minutes
+                        if Date.now.timeIntervalSince(run.started) > 180 { self.runs.remove(at: index); return }
+                        continue
+                    }
+                    if let i = self.runs.firstIndex(where: { $0.id == id }), !response.checks.isEmpty {
+                        self.runs[i].checks = response.checks
+                        let done = response.checks.allSatisfy(\.done)
+                        let state: Run.State = done ? (response.checks.contains(where: \.failed) ? .failed : .passed) : .running
+                        if done, self.runs[i].state != state { self.runs[i].state = state; self.finished(self.runs[i]) }
+                        else { self.runs[i].state = state }
+                    }
+                }
+                guard let current = self.runs.first(where: { $0.id == id }) else { return }
+                let checksDone = current.checks.isEmpty || current.checks.allSatisfy(\.done)
+                // deploys often start after CI: give them two minutes to show up
+                let waitedForDeploys = !current.deploys.isEmpty || Date.now.timeIntervalSince(run.started) > 300
+                if checksDone, deploysSettled, waitedForDeploys {
+                    self.watchers[id] = nil
                     return
                 }
             }
         }
     }
 
+    private func deployed(_ deploy: Deploy, run: Run) {
+        guard !isInFront(run.host) else { return }
+        let ready = deploy.state == .ready
+        onFinish(FinishedInfo(title: ready ? "\(deploy.title) ready · \(run.branch)" : "\(deploy.title) deploy failed · \(run.branch)",
+                              detail: deploy.url?.host ?? run.repo, symbol: ready ? "checkmark" : "xmark",
+                              succeeded: ready))
+    }
+
     private func finished(_ run: Run) {
-        watchers[run.id] = nil
-        if run.state == .passed {
+        if run.state == .passed, run.deploys.isEmpty {
             // a pass needs no follow-up: it leaves after a moment
             Task {
                 try? await Task.sleep(for: .seconds(60))

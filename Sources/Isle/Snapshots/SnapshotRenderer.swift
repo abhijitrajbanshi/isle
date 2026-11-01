@@ -157,6 +157,35 @@ enum SnapshotRenderer {
             })
             c.engine.expand(tab: .home)
         },
+        Scene(name: "31-open-deploy") { c in
+            var run = GitHubModel.Run(repo: "acme/shop", branch: "feature/apple-pay", sha: "45da31f9", started: .now)
+            run.state = .passed
+            run.checks = [.init(name: "build", done: true, failed: false, url: nil)]
+            run.deploys = [.init(environment: "Preview", isProduction: false, state: .ready,
+                                 url: URL(string: "https://shop-git-apple-pay.vercel.app"), logs: nil),
+                           .init(environment: "Production", isProduction: true, state: .building, url: nil, logs: nil)]
+            c.github.preview(runs: [run], pullRequests: [])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "32-open-stuck") { c in
+            var stuck = agent(state: .working)
+            stuck.detail = "Running npm test"
+            stuck.trouble = "“npm test” failed 3 times in a row"
+            stuck.host = 1
+            c.hub.preview([stuck])
+            c.engine.expand(tab: .home)
+        },
+        Scene(name: "33-banner-two-agents") {
+            $0.engine.present(.notice(NoticeInfo(title: "Two agents edited Checkout.swift",
+                                                 detail: "api and web · expect a conflict when you merge",
+                                                 symbol: "arrow.triangle.merge")))
+        },
+        Scene(name: "34-open-servers") { c in
+            c.servers.preview([.init(port: 3000, pid: 501, program: "node", folder: "/Users/you/code/shop"),
+                               .init(port: 5173, pid: 502, program: "node", folder: "/Users/you/code/admin"),
+                               .init(port: 8069, pid: 503, program: "python", folder: "/Users/you/code/odoo")])
+            c.engine.expand(tab: .home)
+        },
         Scene(name: "28-open-usage") { c in
             var a = agent(state: .working)
             a.meter = .init(contextPercent: 64, costUSD: 4.2)

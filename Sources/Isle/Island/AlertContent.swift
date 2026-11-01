@@ -155,6 +155,15 @@ private struct AlertBanner: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { calendar.openCalendar() }
+        case .notice(let info):
+            HStack(spacing: 13) {
+                Image(systemName: info.symbol)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(Palette.amber)
+                    .frame(width: 32)
+                Titles(title: info.title, subtitle: info.detail)
+                Spacer(minLength: 8)
+            }
         case .pullRequest(let info):
             HStack(spacing: 13) {
                 Image(systemName: PullRequestCopy.symbol(info.event))

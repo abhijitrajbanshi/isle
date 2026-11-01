@@ -105,6 +105,16 @@ public struct PullRequestInfo: Equatable, Sendable {
     }
 }
 
+/// Something worth a look, in amber: an agent in trouble, two agents on one file.
+public struct NoticeInfo: Equatable, Sendable {
+    public var title: String
+    public var detail: String
+    public var symbol: String
+    public init(title: String, detail: String, symbol: String) {
+        self.title = title; self.detail = detail; self.symbol = symbol
+    }
+}
+
 /// Short-lived system alerts.
 public enum IslandAlert: Equatable, Sendable {
     case capsLock(isOn: Bool)
@@ -119,9 +129,10 @@ public enum IslandAlert: Equatable, Sendable {
     /// Claude usage crossed 80% or 95% of a window.
     case limit(LimitInfo)
     case pullRequest(PullRequestInfo)
+    case notice(NoticeInfo)
 
     public enum Kind: Hashable, Sendable {
-        case capsLock, power, lowBattery, device, timer, event, finished, limit, pullRequest
+        case capsLock, power, lowBattery, device, timer, event, finished, limit, pullRequest, notice
     }
 
     public enum Style: Sendable {
@@ -144,6 +155,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .finished: .finished
         case .limit: .limit
         case .pullRequest: .pullRequest
+        case .notice: .notice
         }
     }
 
@@ -151,7 +163,7 @@ public enum IslandAlert: Equatable, Sendable {
         switch self {
         case .capsLock: .hud
         case .power, .lowPowerMode: .wide
-        case .lowBattery, .device, .timerDone, .eventSoon, .finished, .limit, .pullRequest: .banner
+        case .lowBattery, .device, .timerDone, .eventSoon, .finished, .limit, .pullRequest, .notice: .banner
         }
     }
 
@@ -162,7 +174,7 @@ public enum IslandAlert: Equatable, Sendable {
         case .power, .lowPowerMode: .milliseconds(2600)
         case .timerDone: .seconds(12)
         case .lowBattery, .device, .eventSoon: .seconds(4)
-        case .finished, .limit, .pullRequest: .seconds(5)
+        case .finished, .limit, .pullRequest, .notice: .seconds(5)
         }
     }
 }

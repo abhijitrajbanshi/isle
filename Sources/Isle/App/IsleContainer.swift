@@ -19,6 +19,7 @@ final class IsleContainer {
     let keepAwake = KeepAwakeModel()
     let hub = ActivityHub()
     let github = GitHubModel()
+    let servers = ServersModel()
     private lazy var server = ActivityServer { [hub] line in await hub.handle(line) }
     /// The island opened itself for an agent's request (so it closes again once answered).
     private var openedForRequest = false
@@ -74,6 +75,7 @@ final class IsleContainer {
         hub.isEnabled = { p.agents }
         hub.onFinish = { [unowned self] in engine.present(.finished($0)) }
         hub.onLimit = { [unowned self] in engine.present(.limit($0)) }
+        hub.onNotice = { [unowned self] in engine.present(.notice($0)) }
         hub.onPush = { [unowned self] folder, host in github.pushed(from: folder, host: host) }
         github.ciEnabled = { p.githubCI }
         github.reviewsEnabled = { p.githubReviews }
@@ -165,6 +167,7 @@ extension View {
             .environment(c.keepAwake)
             .environment(c.hub)
             .environment(c.github)
+            .environment(c.servers)
             .environment(c.shelf)
             .environment(\.openIsleSettings, OpenSettingsAction { c.openSettings() })
     }

@@ -141,6 +141,12 @@ case "shell":
     }
     exit(0)
 
+case "xcode":
+    // Xcode Behaviors: `isle xcode started|succeeded|failed`
+    guard args.count >= 2, ["started", "succeeded", "failed"].contains(args[1]) else { usage() }
+    _ = send(["kind": "xcode", "op": args[1], "ancestors": ancestors()])
+    exit(0)
+
 case "statusline":
     // Claude Code's status line: forward the session's numbers to Isle, and
     // print a short line for Claude Code to show.

@@ -72,6 +72,14 @@ struct CICard: View {
                 }
                 .padding(.top, 10)
             }
+            if !run.deploys.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(run.deploys.enumerated()), id: \.offset) { _, deploy in
+                        DeployRow(deploy: deploy)
+                    }
+                }
+                .padding(.top, 10)
+            }
             HStack(spacing: 8) {
                 if let failing = run.failing, let url = failing.url {
                     CapsuleButton(title: "Open failing job", isPrimary: true) { NSWorkspace.shared.open(url) }
@@ -91,9 +99,53 @@ struct CICard: View {
         switch run.state {
         case .waiting: "Waiting for CI · \(run.branch)"
         case .running: "CI running · \(run.branch)"
-        case .passed: "CI passed · \(run.branch)"
+        case .passed: run.deploys.contains { $0.state == .ready && !$0.isProduction } ? "Preview ready · \(run.branch)"
+                                                                                      : "CI passed · \(run.branch)"
         case .failed: "CI failed · \(run.branch)"
         }
+    }
+}
+
+private struct DeployRow: View {
+    let deploy: GitHubModel.Deploy
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Group {
+                switch deploy.state {
+                case .building: Image(systemName: "clock").foregroundStyle(Palette.secondaryLabel)
+                case .ready: Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.green)
+                case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.red)
+                }
+            }
+            .font(.system(size: 13))
+            .frame(width: 16)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(deploy.title).font(.island(13, .semibold))
+                if let host = deploy.url?.host {
+                    Text(host).font(.island(11.5)).foregroundStyle(Palette.tertiaryLabel).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            switch deploy.state {
+            case .ready:
+                if let url = deploy.url {
+                    CapsuleButton(title: copied ? "Copied" : "Copy URL", isQuiet: true) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                        copied = true
+                    }
+                    CapsuleButton(title: "Open") { NSWorkspace.shared.open(url) }
+                }
+            case .failed:
+                if let logs = deploy.logs { CapsuleButton(title: "Open logs") { NSWorkspace.shared.open(logs) } }
+            case .building:
+                Text("Deploying").font(.island(12, .semibold)).foregroundStyle(Palette.secondaryLabel)
+            }
+        }
+        .frame(minHeight: 40)
+        .overlay(alignment: .top) { Rectangle().fill(Palette.hairline).frame(height: 0.5) }
     }
 }
 

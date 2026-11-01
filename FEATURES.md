@@ -37,6 +37,23 @@ and content cross-fades with a blur, as on iOS.
 
 Priority when several are live: Agent › Timer › Now Playing › Task › Event › Privacy.
 
+### For developers
+
+| What | How it knows | What you see |
+|---|---|---|
+| **Claude Code usage limits** | Claude Code's status line (terminal sessions) | 5-hour and weekly meters, a forecast of when you'll hit the cap, alerts at 80% and 95% |
+| **Ready for review** | Stop hook + git + gh | Summary, time, tests passed or failed, changed files with +/−, Open PR, Go to session |
+| **Claude's questions and plans** | PermissionRequest hook | Options as buttons; plans with Start or Keep planning; "Always allow" when Claude suggests a rule |
+| **Agents in trouble** | Hooks and status line | "Stuck?" when a session compacts 3 times in 30 min, fails the same command 3 times, fills 90% of its context or goes quiet for 10 min |
+| **Two agents, one file** | PostToolUse edits | A warning before it becomes a merge conflict |
+| **Long terminal commands** | zsh integration (Settings) | Anything over 30 s shows; ✓ or ✗ with the time when it ends |
+| **CI and deploys** | Your gh login, after a push | Checks progress, pass or fail with Open failing job; preview ready with Copy URL; production failed with Open logs |
+| **Pull requests** | GitHub notifications you're part of | Review requests; approvals and requested changes on yours |
+| **Localhost** | Listening ports, read when you open the island | Your dev servers by port and project, with Open and Stop |
+| **Xcode builds** | Xcode Behaviors scripts (Settings) | Build succeeded or failed, with the time |
+
+Everything steps aside while the app it came from is in front.
+
 ## 3. System alerts (transient)
 
 | iPhone alert | Isle alert |

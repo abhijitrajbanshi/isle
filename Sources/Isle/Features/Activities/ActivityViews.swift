@@ -82,6 +82,8 @@ struct ActivityStatus: View {
             Text("Ready").font(.island(size, .semibold)).foregroundStyle(Palette.green)
         case .yourTurn:
             Text("Your turn").font(.island(size, .semibold)).foregroundStyle(Palette.green)
+        case .working where activity.trouble != nil:
+            Text("Stuck?").font(.island(size, .semibold)).foregroundStyle(Palette.amber)
         case .working:
             if let progress = activity.progress {
                 Text("\(Int((progress * 100).rounded()))%").font(.islandNumber(size, .semibold))
@@ -529,24 +531,39 @@ struct UsageCompactTrailing: View {
     }
 }
 
-/// An agent at work: what it's doing and for how long.
+/// An agent at work: what it's doing and for how long, and why it might be stuck.
 struct AgentCard: View {
     let activity: ActivityHub.Activity
+    @Environment(ActivityHub.self) private var hub
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: "terminal.fill").font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Palette.secondaryLabel)
-                .frame(width: 44, height: 44)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.secondaryFill))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activity.detail.isEmpty ? "Working" : activity.detail)
-                    .font(.island(17, .semibold)).lineLimit(1)
-                Text(activity.state == .yourTurn ? "Waiting for your next message" : "Claude Code")
-                    .font(.island(13)).foregroundStyle(Palette.secondaryLabel)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: activity.trouble == nil ? "terminal.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(activity.trouble == nil ? Palette.secondaryLabel : Palette.amber)
+                    .frame(width: 44, height: 44)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.secondaryFill))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(activity.detail.isEmpty ? "Working" : activity.detail)
+                        .font(.island(17, .semibold)).lineLimit(1)
+                    if let trouble = activity.trouble {
+                        Text(trouble).font(.island(13)).foregroundStyle(Palette.amber).lineLimit(1)
+                    } else {
+                        Text(activity.state == .yourTurn ? "Waiting for your next message" : "Claude Code")
+                            .font(.island(13)).foregroundStyle(Palette.secondaryLabel)
+                    }
+                }
+                Spacer(minLength: 8)
+                ActivityStatus(activity: activity, size: 13)
             }
-            Spacer(minLength: 8)
-            ActivityStatus(activity: activity, size: 13)
+            if activity.trouble != nil, activity.host != nil {
+                HStack {
+                    CapsuleButton(title: "Go to session", isPrimary: true) { hub.focus(activity) }
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 14)
+            }
         }
     }
 }

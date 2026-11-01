@@ -31,7 +31,7 @@ enum ClaudeConnector {
     /// Events Isle listens to. Only PermissionRequest waits for an answer;
     /// the rest are fire-and-forget.
     static let events = ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest",
-                         "Notification", "Stop", "SessionEnd"]
+                         "Notification", "PreCompact", "Stop", "SessionEnd"]
     private static let marker = "Contents/Helpers/isle\" hook claude"
 
     static var isConnected: Bool {

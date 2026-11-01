@@ -41,6 +41,8 @@ final class ActivityHub {
         /// The last test command it ran, and whether it passed.
         var lastTest: TestRun? = nil
         var review: Review? = nil
+        /// Why this session might be stuck, if it might.
+        var trouble: String? = nil
     }
 
     struct Meter: Equatable {
@@ -137,6 +139,15 @@ final class ActivityHub {
     @ObservationIgnored var onRequest: () -> Void = {}
     /// Called when usage crosses 80% or 95% of a window.
     @ObservationIgnored var onLimit: (LimitInfo) -> Void = { _ in }
+    /// Called when an agent looks stuck, or two agents edit one file.
+    @ObservationIgnored var onNotice: (NoticeInfo) -> Void = { _ in }
+    /// How long a working session can be silent before it looks stuck.
+    @ObservationIgnored var silenceLimit: Duration = .seconds(600)
+    @ObservationIgnored private var silenceTimers: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var compactions: [String: [Date]] = [:]
+    @ObservationIgnored private var failures: [String: (command: String, count: Int)] = [:]
+    @ObservationIgnored private var edits: [String: [(session: String, date: Date)]] = [:]
+    @ObservationIgnored private var warnedEdits: Set<String> = []
     @ObservationIgnored var isEnabled: () -> Bool = { true }
     /// Gathers a finished session's changes (git, gh); replaceable in tests.
     @ObservationIgnored var inspectChanges: @Sendable (String) async -> ChangeSummary = { await ChangeSummary.inspect($0) }
@@ -259,21 +270,36 @@ final class ActivityHub {
         let tool = payload["tool_name"] as? String ?? ""
         let input = payload["tool_input"] as? [String: Any] ?? [:]
 
+        defer { watchSilence(session) }
         switch event {
         case "UserPromptSubmit":
+            compactions[session] = nil
+            failures[session] = nil
             upsert(session, title: project, cwd: cwd) {
                 $0.state = .working
                 $0.detail = "Thinking"
                 $0.started = .now
                 $0.review = nil
                 $0.lastTest = nil
+                $0.trouble = nil
             }
+        case "PreCompact":
+            let recent = (compactions[session] ?? []).filter { Date.now.timeIntervalSince($0) < 30 * 60 } + [Date.now]
+            compactions[session] = recent
+            if recent.count >= 3 { flag(session, "Compacted \(recent.count) times in 30 min") }
         case "PreToolUse":
             upsert(session, title: project, cwd: cwd) {
                 if $0.state != .needsYou { $0.state = .working }
                 $0.detail = Self.doing(tool: tool, subject: Self.subject(tool: tool, input: input))
             }
         case "PostToolUse", "PostToolUseFailure":
+            if tool == "Bash", let command = input["command"] as? String {
+                trackFailure(session, command: command, failed: event == "PostToolUseFailure")
+            }
+            if event == "PostToolUse", ["Edit", "MultiEdit", "Write", "NotebookEdit"].contains(tool),
+               let path = input["file_path"] as? String ?? input["notebook_path"] as? String {
+                trackEdit(session, path: path)
+            }
             if event == "PostToolUse", tool == "Bash", let command = input["command"] as? String, Self.isPush(command) {
                 onPush(Self.pushFolder(command, cwd: cwd), hosts[session])
             }
@@ -311,6 +337,7 @@ final class ActivityHub {
             if let request = activities[index].request { withdraw(request.id) }
             finish(index, summary: payload["last_assistant_message"] as? String)
         case "SessionEnd":
+            silenceTimers.removeValue(forKey: session)?.cancel()
             if let activity = activities.first(where: { $0.id == session }), let request = activity.request {
                 withdraw(request.id)
             }
@@ -355,6 +382,73 @@ final class ActivityHub {
                               succeeded: activity.lastTest?.passed ?? true))
     }
 
+    // MARK: Trouble
+
+    /// Marks a session as possibly stuck, with one notice the first time.
+    private func flag(_ session: String, _ reason: String) {
+        guard let index = activities.firstIndex(where: { $0.id == session }),
+              activities[index].state == .working, activities[index].trouble != reason else { return }
+        let first = activities[index].trouble == nil
+        activities[index].trouble = reason
+        if first, !isInFront(activities[index]) {
+            onNotice(NoticeInfo(title: "\(activities[index].title) may be stuck", detail: reason,
+                                symbol: "exclamationmark.triangle.fill"))
+        }
+    }
+
+    private func unflag(_ session: String, when reason: (String) -> Bool) {
+        guard let index = activities.firstIndex(where: { $0.id == session }),
+              let trouble = activities[index].trouble, reason(trouble) else { return }
+        activities[index].trouble = nil
+    }
+
+    /// The same command failing three times in a row.
+    private func trackFailure(_ session: String, command: String, failed: Bool) {
+        guard failed else {
+            if failures[session]?.command == command {
+                failures[session] = nil
+                unflag(session) { $0.hasPrefix("“") }
+            }
+            return
+        }
+        let count = failures[session]?.command == command ? (failures[session]?.count ?? 0) + 1 : 1
+        failures[session] = (command, count)
+        if count >= 3 { flag(session, "“\(Self.program(command))” failed \(count) times in a row") }
+    }
+
+    /// Two sessions editing the same file within half an hour.
+    private func trackEdit(_ session: String, path: String) {
+        let now = Date.now
+        var recent = (edits[path] ?? []).filter { now.timeIntervalSince($0.date) < 30 * 60 && $0.session != session }
+        let others = recent.compactMap { edit in activities.first { $0.id == edit.session } }
+        recent.append((session, now))
+        edits[path] = recent
+        guard let other = others.first, let mine = activities.first(where: { $0.id == session }) else { return }
+        let key = [session, other.id].sorted().joined(separator: "|") + path
+        guard !warnedEdits.contains(key) else { return }
+        warnedEdits.insert(key)
+        let name = (path as NSString).lastPathComponent
+        let who = mine.title == other.title ? "Two \(mine.title) sessions" : "\(mine.title) and \(other.title)"
+        onNotice(NoticeInfo(title: "Two agents edited \(name)", detail: "\(who) · expect a conflict when you merge",
+                            symbol: "arrow.triangle.merge"))
+    }
+
+    /// A working session that goes quiet for `silenceLimit` may be stuck.
+    private func watchSilence(_ session: String) {
+        silenceTimers[session]?.cancel()
+        guard let activity = activities.first(where: { $0.id == session }), activity.state == .working else {
+            silenceTimers[session] = nil
+            return
+        }
+        unflag(session) { $0.hasPrefix("No activity") }
+        silenceTimers[session] = Task { [weak self, limit = silenceLimit] in
+            try? await Task.sleep(for: limit)
+            guard !Task.isCancelled, let self else { return }
+            let minutes = Int(limit.components.seconds / 60)
+            self.flag(session, "No activity for \(minutes) min")
+        }
+    }
+
     // MARK: Status line (usage, context, cost)
 
     /// One status line update from a Claude Code session.
@@ -364,6 +458,9 @@ final class ActivityHub {
             let context = payload["context_window"] as? [String: Any]
             let cost = payload["cost"] as? [String: Any]
             let model = payload["model"] as? [String: Any]
+            if let percent = Self.double(context?["used_percentage"]), percent >= 90 {
+                flag(session, "Context \(Int(percent))% full")
+            }
             activities[index].meter = Meter(
                 contextPercent: Self.double(context?["used_percentage"]),
                 costUSD: Self.double(cost?["total_cost_usd"]),
@@ -450,6 +547,26 @@ final class ActivityHub {
         onFinish(FinishedInfo(title: activity.title,
                               detail: status == 0 ? "Finished in \(took)" : "Failed after \(took) · exit \(status)",
                               symbol: status == 0 ? "checkmark" : "xmark", succeeded: status == 0))
+    }
+
+    // MARK: Xcode (Behaviors scripts)
+
+    func xcodeStarted(ancestors: [pid_t] = []) {
+        let host = ancestors.isEmpty ? nil : resolveHost(ancestors)
+        activities.removeAll { $0.id == "xcode" }
+        activities.append(Activity(id: "xcode", kind: .task, title: "Xcode build", detail: "Building", state: .working,
+                                   progress: nil, started: .now, request: nil, host: host))
+    }
+
+    func xcodeFinished(succeeded: Bool) {
+        guard let index = activities.firstIndex(where: { $0.id == "xcode" }) else { return }
+        let build = activities.remove(at: index)
+        // you were watching Xcode
+        guard !isInFront(build) else { return }
+        let seconds = Int(Date.now.timeIntervalSince(build.started))
+        let took = String(format: "%d:%02d", seconds / 60, seconds % 60)
+        onFinish(FinishedInfo(title: succeeded ? "Build succeeded" : "Build failed", detail: "Xcode · \(took)",
+                              symbol: succeeded ? "checkmark" : "xmark", succeeded: succeeded))
     }
 
     /// Editors, pagers, remote shells and REPLs run as long as you use them,

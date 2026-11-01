@@ -36,6 +36,43 @@ enum GitHubAPI {
         return CheckRuns(checks: checks, etag: http.value(forHTTPHeaderField: "ETag"))
     }
 
+    /// A commit's deployments (Vercel, Netlify and others report to GitHub)
+    /// with each one's latest status.
+    static func deployments(repo: String, sha: String, token: String) async -> [GitHubModel.Deploy] {
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/deployments?sha=\(sha)&per_page=10")!)
+        authorize(&request, token: token)
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        var deploys: [GitHubModel.Deploy] = []
+        for deployment in list {
+            guard let id = deployment["id"] as? Int else { continue }
+            var statuses = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/deployments/\(id)/statuses?per_page=1")!)
+            authorize(&statuses, token: token)
+            let latest = (try? await URLSession.shared.data(for: statuses))
+                .flatMap { try? JSONSerialization.jsonObject(with: $0.0) as? [[String: Any]] }?.first
+            deploys.append(deploy(deployment, latest: latest))
+        }
+        return deploys
+    }
+
+    static func deploy(_ deployment: [String: Any], latest status: [String: Any]?) -> GitHubModel.Deploy {
+        let environment = deployment["environment"] as? String ?? "Deploy"
+        let state: GitHubModel.Deploy.State = switch status?["state"] as? String {
+        case "success": .ready
+        case "failure", "error": .failed
+        case "inactive": .ready
+        default: .building
+        }
+        let url = (status?["environment_url"] as? String).flatMap(URL.init(string:))
+            ?? (status?["target_url"] as? String).flatMap(URL.init(string:))
+        let logs = (status?["log_url"] as? String).flatMap(URL.init(string:))
+            ?? (status?["target_url"] as? String).flatMap(URL.init(string:))
+        let production = deployment["production_environment"] as? Bool
+            ?? environment.localizedCaseInsensitiveContains("production")
+        return GitHubModel.Deploy(environment: environment, isProduction: production, state: state,
+                                  url: url?.scheme?.hasPrefix("http") == true ? url : nil, logs: logs)
+    }
+
     /// Notifications you're directly part of: review requests, your PRs, CI you triggered.
     static func notifications(token: String, since lastModified: String?) async -> Notifications? {
         var request = URLRequest(url: URL(string: "https://api.github.com/notifications?participating=true&per_page=50")!)

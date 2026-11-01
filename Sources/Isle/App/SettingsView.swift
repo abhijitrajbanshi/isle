@@ -100,6 +100,7 @@ private struct AgentsPane: View {
     @Environment(GitHubModel.self) private var github
     @State private var connected = ClaudeConnector.isConnected
     @State private var shellConnected = ShellConnector.isConnected
+    @State private var xcodeInstalled = XcodeScripts.isInstalled
     @State private var error: String?
     @State private var copied = false
 
@@ -179,10 +180,16 @@ private struct AgentsPane: View {
                         Button("Connect") { changeShell(ShellConnector.connect) }
                     }
                 }
+                LabeledContent("Xcode builds") {
+                    Button(xcodeInstalled ? "Show Scripts" : "Install Scripts") {
+                        changeShell { try XcodeScripts.install() }
+                        xcodeInstalled = XcodeScripts.isInstalled
+                    }
+                }
             } header: {
-                Text("Terminal")
+                Text("Terminal and Xcode")
             } footer: {
-                Note("Any command that runs longer than 30 seconds shows in the notch, and you get ✓ or ✗ when it ends, unless its terminal is in front. Connecting adds three lines to ~/.zshrc and keeps a backup; new terminal windows pick it up.")
+                Note("Any command that runs longer than 30 seconds shows in the notch, and you get ✓ or ✗ when it ends, unless its terminal is in front. Connecting adds three lines to ~/.zshrc and keeps a backup; new terminal windows pick it up. For Xcode, install the scripts, then in Xcode → Settings → Behaviors choose Run for Build Starts, Succeeds and Fails, and pick the matching script.")
             }
 
             Section {
