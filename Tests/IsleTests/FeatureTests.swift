@@ -3,6 +3,18 @@ import IsleKit
 import Testing
 @testable import Isle
 
+/// Waits for timed work to happen, checking every 10 ms for up to 2 s. CI
+/// machines run many tests at once, so a fixed sleep can end too early.
+@MainActor
+func eventually(within timeout: Duration = .seconds(2), _ condition: () -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now + timeout
+    while !condition() {
+        if ContinuousClock.now > deadline { return false }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return true
+}
+
 // MARK: - Now Playing bridge protocol
 
 struct BridgeMessageTests {
@@ -62,8 +74,7 @@ struct NowPlayingModelTests {
         model.lingerDuration = .milliseconds(20)
         model.update(track: track, isPlaying: false, elapsed: 10, timestamp: .now)
         #expect(model.isActive)
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(!model.isActive)
+        #expect(await eventually { !model.isActive })
     }
 
     @Test func playingStaysActive() async throws {
@@ -156,8 +167,7 @@ struct NowPlayingModelTests {
         try await Task.sleep(for: .milliseconds(120))
         #expect(model.artwork != nil)
         model.artworkUnavailable()
-        try await Task.sleep(for: .milliseconds(120))
-        #expect(model.artwork == nil)
+        #expect(await eventually { model.artwork == nil })
     }
 
     @Test func clearRemovesTrack() {
@@ -192,8 +202,7 @@ struct TimerModelTests {
         var finished = false
         timer.onFinish = { finished = true }
         timer.start(0.05)
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(finished && !timer.isActive)
+        #expect(await eventually { finished && !timer.isActive })
     }
 
     @Test func countdownTicksOnWholeSeconds() {
