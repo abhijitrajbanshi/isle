@@ -73,6 +73,8 @@ struct StackView: View {
     /// Left of the notch: what this is. Right: its state or one control.
     @ViewBuilder
     private func header(for hero: Hero) -> some View {
+        // each side gets only the room beside the notch, so nothing slides under it
+        let side = (engine.layout.expandedWidth - 44 - engine.metrics.size.width) / 2 - 12
         HStack(spacing: 0) {
             Group {
                 if let panel {
@@ -84,7 +86,8 @@ struct StackView: View {
             .font(.island(12, .semibold))
             .foregroundStyle(Palette.secondaryLabel)
             .lineLimit(1)
-            Spacer(minLength: engine.metrics.size.width + 24)
+            .frame(maxWidth: side, alignment: .leading)
+            Spacer(minLength: 0)
             Group {
                 if panel != nil {
                     CapsuleButton(title: "Done", isQuiet: true) { panel = nil }
@@ -93,6 +96,7 @@ struct StackView: View {
                 }
             }
             .font(.island(12, .semibold))
+            .frame(maxWidth: side, alignment: .trailing)
         }
         .padding(.top, 2)
     }

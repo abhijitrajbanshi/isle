@@ -399,7 +399,7 @@ struct Chip: View {
                     .font(.system(size: 11, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
                 if let title {
-                    Text(title).font(.island(11.5, .medium)).lineLimit(1)
+                    Text(title).font(.island(11.5, .medium)).lineLimit(1).truncationMode(.tail)
                         .contentTransition(.numericText())
                 }
                 if disclosure {

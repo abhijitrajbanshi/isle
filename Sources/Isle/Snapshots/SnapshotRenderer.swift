@@ -90,6 +90,8 @@ enum SnapshotRenderer {
         },
         Scene(name: "16-open-music") { c in
             playing(c)
+            c.audio.preview(outputs: [("soundcore Liberty 4 NC Wireless Earbuds", kAudioDeviceTransportTypeBluetooth)],
+                            current: 0, micMuted: false)
             c.hub.preview([agent(state: .working)])
             c.engine.expand(tab: .home)
         },
