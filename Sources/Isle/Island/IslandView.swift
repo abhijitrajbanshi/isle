@@ -32,6 +32,7 @@ struct IslandView: View {
         .animation(reduceMotion ? Motion.reduced : Motion.morph, value: engine.isHovering)
         .animation(Motion.morph, value: engine.metrics)
         .animation(reduceMotion ? Motion.reduced : Motion.morph, value: engine.expandedHeight)
+        .animation(reduceMotion ? Motion.reduced : Motion.morph, value: engine.compactContent)
         .task(id: presentation.isIdle) {
             // Once the shape has shrunk back into the notch, stop drawing it.
             isResting = false

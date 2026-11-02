@@ -1,5 +1,15 @@
 import CoreGraphics
 
+/// The natural width of a live activity's content either side of the notch.
+public struct CompactContentWidth: Equatable, Sendable {
+    public var leading: CGFloat
+    public var trailing: CGFloat
+    public init(leading: CGFloat, trailing: CGFloat) {
+        self.leading = leading
+        self.trailing = trailing
+    }
+}
+
 /// Sizes for every presentation, derived from the notch so the island looks
 /// right on any MacBook (and on displays without a notch).
 public struct IslandLayout: Equatable, Sendable {
@@ -7,11 +17,20 @@ public struct IslandLayout: Equatable, Sendable {
     /// The open island is as tall as its content (measured by the view),
     /// notch row included.
     public var expandedHeight: CGFloat
+    /// Measured content width either side of the notch, per activity.
+    public var compactContent: [LiveActivity: CompactContentWidth]
 
-    public init(metrics: NotchMetrics, expandedHeight: CGFloat = 200) {
+    public init(metrics: NotchMetrics, expandedHeight: CGFloat = 200,
+                compactContent: [LiveActivity: CompactContentWidth] = [:]) {
         self.metrics = metrics
         self.expandedHeight = expandedHeight
+        self.compactContent = compactContent
     }
+
+    /// Content sits this far from the notch on both sides, hugging it.
+    public static let notchGap: CGFloat = 7
+    /// And this far from the island's outer edge (its corner).
+    public static let outerInset: CGFloat = 11
 
     /// The open island never grows past this; anything taller scrolls out of
     /// the bottom rather than pushing the top under the notch.
@@ -68,8 +87,16 @@ public struct IslandLayout: Equatable, Sendable {
     public func sides(for activity: LiveActivity) -> (leading: CGFloat, trailing: CGFloat) {
         switch activity {
         // artwork and level meter, and the privacy dot, balance either side
-        case .nowPlaying, .privacy: (sideWidth(for: activity), sideWidth(for: activity))
-        default: (iconSide, sideWidth(for: activity))
+        case .nowPlaying, .privacy:
+            return (sideWidth(for: activity), sideWidth(for: activity))
+        default:
+            // once measured, each side is exactly its content, the gap to the
+            // notch and the inset to the corner: short words make a short island
+            guard let content = compactContent[activity] else { return (iconSide, sideWidth(for: activity)) }
+            let padding = Self.notchGap + Self.outerInset
+            let leading = min(max(content.leading + padding, iconSide), sideWidth(for: activity))
+            let trailing = min(max(content.trailing + padding, iconSide), sideWidth(for: activity) + 12)
+            return (leading.rounded(.up), trailing.rounded(.up))
         }
     }
 

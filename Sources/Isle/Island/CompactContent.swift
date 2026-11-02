@@ -6,20 +6,54 @@ struct CompactContent: View {
     @Environment(IslandEngine.self) private var engine
     let activity: LiveActivity
 
-    /// Inset from the body edge, matched to the corner radius so content
-    /// sits optically centred in each lobe.
-    private let inset: CGFloat = 11
+    /// Whether this activity's sides follow its content (everything but the
+    /// balanced music and privacy glances).
+    private var hugsNotch: Bool { activity != .nowPlaying && activity != .privacy }
 
     var body: some View {
         let sides = engine.layout.sides(for: activity)
         let height = engine.metrics.size.height
-        HStack(spacing: 0) {
-            leading(height: height).frame(width: sides.leading - inset, alignment: .leading)
-            Spacer(minLength: 0)
-            trailing.frame(width: sides.trailing - inset, alignment: .trailing)
+        let outer = IslandLayout.outerInset
+        if hugsNotch {
+            // both sides hug the notch: the icon ends just before it, the word starts just after
+            let gap = IslandLayout.notchGap
+            HStack(spacing: 0) {
+                measured(leading(height: height)) { width in record(leading: width) }
+                    .frame(width: max(sides.leading - outer - gap, 0), alignment: .trailing)
+                Spacer(minLength: 0)
+                measured(trailing) { width in record(trailing: width) }
+                    .frame(width: max(sides.trailing - outer - gap, 0), alignment: .leading)
+            }
+            .padding(.horizontal, outer)
+            .frame(height: height)
+        } else {
+            HStack(spacing: 0) {
+                leading(height: height).frame(width: sides.leading - outer, alignment: .leading)
+                Spacer(minLength: 0)
+                trailing.frame(width: sides.trailing - outer, alignment: .trailing)
+            }
+            .padding(.horizontal, outer)
+            .frame(height: height)
         }
-        .padding(.horizontal, inset)
-        .frame(height: height)
+    }
+
+    /// The content at its natural width, reported so the island can fit it.
+    private func measured(_ content: some View, report: @escaping (CGFloat) -> Void) -> some View {
+        content
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { report($0) }
+    }
+
+    private func record(leading: CGFloat? = nil, trailing: CGFloat? = nil) {
+        var widths = engine.compactContent[activity] ?? CompactContentWidth(leading: 0, trailing: 0)
+        if let leading { widths.leading = leading }
+        if let trailing { widths.trailing = trailing }
+        // ignore sub-point jitter so text updates don't nudge the island
+        guard let old = engine.compactContent[activity],
+              abs(old.leading - widths.leading) < 0.5, abs(old.trailing - widths.trailing) < 0.5 else {
+            engine.compactContent[activity] = widths
+            return
+        }
     }
 
     @ViewBuilder

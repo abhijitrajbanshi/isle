@@ -72,7 +72,12 @@ public final class IslandEngine {
     /// Measured height of the open island's content, notch row included.
     public var expandedHeight: CGFloat = 200
 
-    public var layout: IslandLayout { IslandLayout(metrics: metrics, expandedHeight: expandedHeight) }
+    /// Measured content of each live activity's glance (see `IslandLayout.sides`).
+    public var compactContent: [LiveActivity: CompactContentWidth] = [:]
+
+    public var layout: IslandLayout {
+        IslandLayout(metrics: metrics, expandedHeight: expandedHeight, compactContent: compactContent)
+    }
 
     public var presentation: Presentation {
         if isExpanded { return .expanded }
