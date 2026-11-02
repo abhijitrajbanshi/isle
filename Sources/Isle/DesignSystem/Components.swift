@@ -465,12 +465,14 @@ struct ActionPill: View {
     let title: String
     var color: Color
     var height: CGFloat = 28
+    /// Beside the notch the title alone fits better.
+    var showsSymbol = true
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: symbol).font(.system(size: height * 0.38, weight: .bold))
+                if showsSymbol { Image(systemName: symbol).font(.system(size: height * 0.38, weight: .bold)) }
                 Text(title).font(.island(height * 0.45, .semibold))
             }
             .foregroundStyle(.black.opacity(0.85))

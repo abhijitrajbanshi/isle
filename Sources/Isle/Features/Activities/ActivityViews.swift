@@ -10,11 +10,11 @@ struct ActivityCompactLeading: View {
 
     var body: some View {
         if let activity = hub.live.first(where: { $0.kind == kind }) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 if kind == .agent {
-                    Image(systemName: "terminal.fill").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "terminal.fill").font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Palette.secondaryLabel)
-                    Text(activity.title).font(.island(13, .semibold)).lineLimit(1)
+                    Text(activity.title).font(.island(12.5, .semibold)).lineLimit(1).truncationMode(.tail)
                 } else {
                     ProgressGlyph(progress: activity.progress, size: 15)
                 }
@@ -30,7 +30,7 @@ struct ActivityCompactTrailing: View {
 
     var body: some View {
         if let activity = hub.live.first(where: { $0.kind == kind }) {
-            ActivityStatus(activity: activity, size: 13)
+            ActivityStatus(activity: activity, size: 12.5, compact: true)
         }
     }
 }
@@ -62,11 +62,13 @@ struct ActivityBubble: View {
 struct ActivityStatus: View {
     let activity: ActivityHub.Activity
     var size: CGFloat = 13
+    /// Beside the notch: one short word, so the island stays narrow.
+    var compact = false
 
     private var needsYouLabel: String {
         switch activity.request?.kind {
-        case .question: "Question"
-        case .plan: "Plan ready"
+        case .question: compact ? "Pick" : "Question"
+        case .plan: compact ? "Plan" : "Plan ready"
         default: "Allow?"
         }
     }
@@ -74,14 +76,14 @@ struct ActivityStatus: View {
     var body: some View {
         switch activity.state {
         case .needsYou:
-            HStack(spacing: 5) {
+            HStack(spacing: compact ? 3 : 5) {
                 PulsingDot(color: Palette.amber)
                 Text(needsYouLabel).font(.island(size, .semibold)).foregroundStyle(Palette.amber)
             }
         case .review:
             Text("Ready").font(.island(size, .semibold)).foregroundStyle(Palette.green)
         case .yourTurn:
-            Text("Your turn").font(.island(size, .semibold)).foregroundStyle(Palette.green)
+            Text(compact ? "Reply" : "Your turn").font(.island(size, .semibold)).foregroundStyle(Palette.green)
         case .working where activity.trouble != nil:
             Text("Stuck?").font(.island(size, .semibold)).foregroundStyle(Palette.amber)
         case .working:
@@ -90,7 +92,7 @@ struct ActivityStatus: View {
             } else {
                 // minutes, not seconds: calm, and nothing ticks every second
                 TimelineView(.periodic(from: activity.started, by: 30)) { context in
-                    Text(Elapsed.short(since: activity.started, now: context.date))
+                    Text(Elapsed.short(since: activity.started, now: context.date, compact: compact))
                         .font(.islandNumber(size, .semibold))
                         .foregroundStyle(Palette.secondaryLabel)
                         .contentTransition(.numericText())
@@ -101,10 +103,10 @@ struct ActivityStatus: View {
 }
 
 enum Elapsed {
-    static func short(since start: Date, now: Date = .now) -> String {
+    static func short(since start: Date, now: Date = .now, compact: Bool = false) -> String {
         let minutes = Int(now.timeIntervalSince(start) / 60)
         switch minutes {
-        case ..<1: return "Working"
+        case ..<1: return compact ? "<1m" : "Working"
         case ..<60: return "\(minutes)m"
         default: return "\(minutes / 60)h \(minutes % 60)m"
         }
@@ -508,11 +510,9 @@ private struct UsageMeter: View {
 /// Beside the notch when a window is nearly used up.
 struct UsageCompactLeading: View {
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 12, weight: .semibold))
-            Text("Claude").font(.island(13, .semibold))
-        }
-        .foregroundStyle(Palette.secondaryLabel)
+        Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Palette.amber)
+            .accessibilityLabel("Claude usage")
     }
 }
 

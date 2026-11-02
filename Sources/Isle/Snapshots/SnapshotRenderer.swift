@@ -186,6 +186,25 @@ enum SnapshotRenderer {
                                .init(port: 8069, pid: 503, program: "python", folder: "/Users/you/code/odoo")])
             c.engine.expand(tab: .home)
         },
+        Scene(name: "40-compact-agent-reply") { c in
+            c.hub.preview([agent(state: .yourTurn)]); c.engine.activities = { [.agent] }
+        },
+        Scene(name: "41-compact-agent-ready") { c in
+            c.hub.preview([agent(state: .review)]); c.engine.activities = { [.agent] }
+        },
+        Scene(name: "42-compact-agent-long-name") { c in
+            var a = agent(state: .working)
+            a.title = "cust-odoo-acculon"
+            c.hub.preview([a]); c.engine.activities = { [.agent] }
+        },
+        Scene(name: "43-compact-ci") { c in
+            var run = GitHubModel.Run(repo: "o/r", branch: "main", sha: "a", started: .now)
+            run.state = .passed
+            c.github.preview(runs: [run], pullRequests: []); c.engine.activities = { [.ci] }
+        },
+        Scene(name: "44-compact-timer") { c in
+            c.timer.preview(remaining: 272, of: 600); c.engine.activities = { [.timer] }
+        },
         Scene(name: "28-open-usage") { c in
             var a = agent(state: .working)
             a.meter = .init(contextPercent: 64, costUSD: 4.2)

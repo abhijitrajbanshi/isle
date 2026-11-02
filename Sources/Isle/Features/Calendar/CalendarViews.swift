@@ -20,7 +20,7 @@ struct CalendarCompactTrailing: View {
             TimelineView(.periodic(from: .now, by: 15)) { context in
                 // a call about to start: join straight from the notch
                 if let meeting = event.meeting, event.start.timeIntervalSince(context.date) < 2 * 60 {
-                    ActionPill(symbol: "video.fill", title: "Join", color: event.color.color, height: 22) {
+                    ActionPill(symbol: "video.fill", title: "Join", color: event.color.color, height: 22, showsSymbol: false) {
                         calendar.join(meeting)
                     }
                 } else {

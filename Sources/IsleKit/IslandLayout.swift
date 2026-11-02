@@ -65,13 +65,14 @@ public struct IslandLayout: Equatable, Sendable {
     public func sideWidth(for activity: LiveActivity) -> CGFloat {
         switch activity {
         case .nowPlaying: notchHeight + 10
-        case .timer: 70
-        case .calendar: 72
+        // as narrow as each one's content allows: menu bar items sit right beside the island
+        case .timer: 62
+        case .calendar: 66
         case .privacy: notchHeight + 2
-        case .task: 64
-        case .agent: 84
-        case .usage: 92
-        case .ci: 72
+        case .task: 52
+        case .agent: 64
+        case .usage: 50
+        case .ci: 58
         }
     }
 
