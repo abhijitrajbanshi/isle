@@ -41,7 +41,8 @@ public struct IslandLayout: Equatable, Sendable {
             return IslandShape(width: notchWidth - 8, height: notchHeight, shoulder: 4, radius: 9)
 
         case .compact(let primary, _):
-            return IslandShape(width: notchWidth + sideWidth(for: primary) * 2, height: notchHeight,
+            let sides = sides(for: primary)
+            return IslandShape(width: notchWidth + sides.leading + sides.trailing, height: notchHeight,
                                shoulder: 6, radius: compactRadius)
 
         case .alert(let alert):
@@ -62,6 +63,27 @@ public struct IslandLayout: Equatable, Sendable {
     }
 
     /// Width of the content column on each side of the notch.
+    /// Width on each side of the notch. The left holds an icon, so it's
+    /// narrow (apps' menus sit there); the right holds the one word of state.
+    public func sides(for activity: LiveActivity) -> (leading: CGFloat, trailing: CGFloat) {
+        switch activity {
+        // artwork and level meter, and the privacy dot, balance either side
+        case .nowPlaying, .privacy: (sideWidth(for: activity), sideWidth(for: activity))
+        default: (iconSide, sideWidth(for: activity))
+        }
+    }
+
+    /// Room for one icon beside the notch.
+    public var iconSide: CGFloat { notchHeight - 2 }
+
+    /// How far the island sits right of centre so the notch stays over the
+    /// hardware notch when its sides differ.
+    public func offset(for presentation: Presentation) -> CGFloat {
+        guard case .compact(let primary, _) = presentation else { return 0 }
+        let sides = sides(for: primary)
+        return (sides.trailing - sides.leading) / 2
+    }
+
     public func sideWidth(for activity: LiveActivity) -> CGFloat {
         switch activity {
         case .nowPlaying: notchHeight + 10
@@ -82,7 +104,7 @@ public struct IslandLayout: Equatable, Sendable {
         var width = shape.outerWidth
         if case .compact(_, .some) = presentation { width += Self.bubbleGap + bubbleDiameter }
         let screen = metrics.screenFrame
-        return CGRect(x: screen.midX - shape.outerWidth / 2, y: screen.maxY - shape.height,
+        return CGRect(x: screen.midX - shape.outerWidth / 2 + offset(for: presentation), y: screen.maxY - shape.height,
                       width: width, height: shape.height)
     }
 

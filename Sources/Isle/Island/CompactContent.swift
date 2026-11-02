@@ -11,12 +11,12 @@ struct CompactContent: View {
     private let inset: CGFloat = 11
 
     var body: some View {
-        let side = engine.layout.sideWidth(for: activity)
+        let sides = engine.layout.sides(for: activity)
         let height = engine.metrics.size.height
         HStack(spacing: 0) {
-            leading(height: height).frame(width: side - inset, alignment: .leading)
+            leading(height: height).frame(width: sides.leading - inset, alignment: .leading)
             Spacer(minLength: 0)
-            trailing.frame(width: side - inset, alignment: .trailing)
+            trailing.frame(width: sides.trailing - inset, alignment: .trailing)
         }
         .padding(.horizontal, inset)
         .frame(height: height)

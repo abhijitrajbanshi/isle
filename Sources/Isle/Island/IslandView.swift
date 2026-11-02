@@ -69,6 +69,9 @@ struct IslandView: View {
             .modifier(SystemInteractions(isEnabled: !isSnapshot, engine: engine, onDrop: acceptDrop))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Isle")
+            // uneven sides: the whole island (shape, content, bubble) shifts so its
+            // notch gap stays over the hardware notch
+            .offset(x: engine.layout.offset(for: presentation))
     }
 
     @ViewBuilder

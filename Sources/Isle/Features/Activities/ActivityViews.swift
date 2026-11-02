@@ -12,9 +12,11 @@ struct ActivityCompactLeading: View {
         if let activity = hub.live.first(where: { $0.kind == kind }) {
             HStack(spacing: 4) {
                 if kind == .agent {
-                    Image(systemName: "terminal.fill").font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Palette.secondaryLabel)
-                    Text(activity.title).font(.island(12.5, .semibold)).lineLimit(1).truncationMode(.tail)
+                    // the icon alone: the left side stays clear of apps' menus; the name is in the open island
+                    Image(systemName: activity.trouble == nil ? "terminal.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(activity.trouble == nil ? Palette.secondaryLabel : Palette.amber)
+                        .accessibilityLabel("Claude Code · \(activity.title)")
                 } else {
                     ProgressGlyph(progress: activity.progress, size: 15)
                 }

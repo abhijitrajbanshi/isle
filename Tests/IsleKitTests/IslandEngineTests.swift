@@ -287,8 +287,14 @@ struct LayoutTests {
 
     @Test(arguments: LiveActivity.allCases)
     func compactLeavesTheNotchClear(activity: LiveActivity) {
-        let shape = layout.shape(for: .compact(primary: activity, secondary: nil), isHovering: false)
-        #expect(shape.width - 2 * layout.sideWidth(for: activity) >= notch.width)
+        let presentation = Presentation.compact(primary: activity, secondary: nil)
+        let shape = layout.shape(for: presentation, isHovering: false)
+        let sides = layout.sides(for: activity)
+        #expect(shape.width - sides.leading - sides.trailing >= notch.width)
+        // with uneven sides the island shifts so its notch gap sits exactly over the hardware notch
+        let frame = layout.frame(for: presentation, isHovering: false)
+        let gapStart = frame.minX + shape.shoulder + sides.leading
+        #expect(abs(gapStart - (NotchMetrics.preview.screenFrame.midX - notch.width / 2)) < 0.5)
     }
 
     @Test func frameIsCentredOnTheNotch() {
@@ -300,7 +306,7 @@ struct LayoutTests {
     @Test func hitRectIncludesBubble() {
         let p = Presentation.compact(primary: .timer, secondary: .nowPlaying)
         let shape = layout.shape(for: p, isHovering: false)
-        let bubbleCentre = CGPoint(x: NotchMetrics.preview.screenFrame.midX + shape.outerWidth / 2
+        let bubbleCentre = CGPoint(x: NotchMetrics.preview.screenFrame.midX + shape.outerWidth / 2 + layout.offset(for: p)
                                       + IslandLayout.bubbleGap + layout.bubbleDiameter / 2,
                                    y: NotchMetrics.preview.screenFrame.maxY - layout.bubbleDiameter / 2)
         #expect(layout.hitRect(for: p, isHovering: false).contains(bubbleCentre))
